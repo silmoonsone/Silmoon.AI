@@ -1,13 +1,13 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
-VisualStudioVersion = 17.14.36310.24 d17.14
+VisualStudioVersion = 17.14.36310.24
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI", "Silmoon.AI\Silmoon.AI.csproj", "{252488FF-FB2F-4FB1-8F8D-72D4F0781E1B}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Testing", "Testing", "{02EA681E-C7D8-13C7-8484-4AC65E1B71E8}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.BaseHostingTest", "Silmoon.AI.BaseHostingTest\Silmoon.AI.BaseHostingTest.csproj", "{02F1D6BD-5E7D-4961-8281-6CEACEDD9D99}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.HostingTest", "Silmoon.AI.HostingTest\Silmoon.AI.HostingTest.csproj", "{02F1D6BD-5E7D-4961-8281-6CEACEDD9D99}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "解决方案项", "解决方案项", "{9FA3D6BD-1EC1-3BA5-80CB-CE02773A58D5}"
 	ProjectSection(SolutionItems) = preProject

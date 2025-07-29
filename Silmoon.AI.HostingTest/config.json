@@ -1,0 +1,5 @@
+﻿{
+  "mongodb": "mongodb://user:pwd@mongodb0-internal.mongodbserver.host/dbname",
+  "aiKey": "",
+  "aiModelName": ""
+}
