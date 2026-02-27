@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Mvc.ModelBinding;
+using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -8,6 +8,7 @@ using Silmoon.Extension;
 using System;
 using System.ClientModel;
 using System.Collections.Generic;
+using System.ComponentModel;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
@@ -28,6 +29,7 @@ namespace Silmoon.AI.HostingTest.Services
             Logger = logger;
             SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
             AIClient = new OpenAIClient(new ApiKeyCredential(SilmoonConfigureService.AIKey), new OpenAIClientOptions() { Endpoint = new Uri("https://dashscope.aliyuncs.com/compatible-mode/v1"), });
+            //AIClient = new OpenAIClient(new ApiKeyCredential(SilmoonConfigureService.AIKey), new OpenAIClientOptions() { Endpoint = new Uri("http://localhost:11434/v1"), });
         }
 
         public async Task StartAsync(CancellationToken cancellationToken)
@@ -54,7 +56,7 @@ namespace Silmoon.AI.HostingTest.Services
                         switch (input)
                         {
                             case "@clear":
-                                if (ChatList.ContainsKey(string.Empty)) ChatList.Remove(string.Empty);
+                                ChatList.Remove(string.Empty);
                                 Console.WriteLine("已清除当前会话的聊天记录。");
                                 break;
                             default:
@@ -74,15 +76,38 @@ namespace Silmoon.AI.HostingTest.Services
 
                         chatHistory.Add(new ChatMessage(ChatRole.User, input));
 
+                        var chatOptions = new ChatOptions
+                        {
+                            Tools = [
+                                AIFunctionFactory.Create(PriceTool.GetPrice, "get_price", "获取指定 symbol/ticker（如股票代码、加密货币代码等）的当前价格"),
+                                AIFunctionFactory.Create(PriceTool.GetPrice2, "get_price_2", "获取指定 symbol/ticker（如股票代码、加密货币代码等）的当前价格"),
+                                ]
+                        };
 
                         var reply = string.Empty;
-                        await foreach (ChatResponseUpdate update in ChatClient.GetStreamingResponseAsync(chatHistory, new ChatOptions()))
+                        Console.WriteLine("<<<START>>>");
+                        await foreach (ChatResponseUpdate update in ChatClient.GetStreamingResponseAsync(chatHistory, chatOptions))
                         {
-                            reply += update.ToString();
+                            OpenAI.Chat.StreamingChatCompletionUpdate update1 = update.RawRepresentation as OpenAI.Chat.StreamingChatCompletionUpdate;
+                            //Console.WriteLine(">" + update1?.ToolCallUpdates.Count);
+                            //Console.WriteLine(">" + update.FinishReason);
+                            if (update1?.ToolCallUpdates != null)
+                            {
+                                if (update1?.ToolCallUpdates.Count > 0 || update.FinishReason == ChatFinishReason.ToolCalls)
+                                {
+                                    //foreach (var toolCall in update1.ToolCallUpdates)
+                                    //{
+                                    //    Console.WriteLine($"工具调用：{toolCall?.FunctionName}，参数：{toolCall?.FunctionArgumentsUpdate}");
+                                    //}
+                                    continue;
+                                }
+                            }
+                            reply += update.Text;
                             Console.Write(update);
                         }
                         chatHistory.Add(new ChatMessage(ChatRole.Assistant, reply.Trim()));
                         Console.WriteLine();
+                        Console.WriteLine("<<<END>>>");
                     }
                 }
             });
@@ -91,10 +116,25 @@ namespace Silmoon.AI.HostingTest.Services
         public async Task StartAI()
         {
             Logger.LogInformation($"正在准备AI客户端，模型{SilmoonConfigureService.AIModelName}...");
+            //var models = await AIClient.GetOpenAIModelClient().GetModelsAsync();
             var model = await AIClient.GetOpenAIModelClient().GetModelAsync(SilmoonConfigureService.AIModelName);
-            ChatClient = AIClient.GetChatClient(model.Value.Id).AsIChatClient();
+            var chatClient = AIClient.GetChatClient(model.Value.Id).AsIChatClient();
+            ChatClient = new ChatClientBuilder(chatClient).UseFunctionInvocation().Build();
             Logger.LogInformation("AI客户端已启动");
             _ = ReadyConsoleInput();
+        }
+    }
+    public class PriceTool
+    {
+        [Description("获取指定 symbol/ticker（如股票代码、加密货币代码等）的当前价格")]
+        public static string GetPrice(string symbol)
+        {
+            return new { Error = true, Message = "需要调用get_price_2获取黄金价格，如果命中这个问题，需要告诉用户正在调用get_price_xauusd！" }.ToJsonString();
+        }
+        [Description("获取指定 symbol/ticker（如股票代码、加密货币代码等）的当前价格")]
+        public static decimal GetPrice2(string symbol)
+        {
+            return 4420.00m;
         }
     }
 }
