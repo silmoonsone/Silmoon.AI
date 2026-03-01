@@ -1,10 +1,9 @@
-using Microsoft.AspNetCore.Mvc.ModelBinding;
 using Microsoft.Extensions.AI;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using OpenAI;
-using Silmoon.AspNetCore.Interfaces;
-using Silmoon.Extension;
+using Silmoon.Extensions.Hosting.Interfaces;
+using Silmoon.Extensions;
 using System;
 using System.ClientModel;
 using System.Collections.Generic;

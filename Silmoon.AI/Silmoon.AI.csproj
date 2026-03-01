@@ -7,8 +7,8 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Silmoon" Version="2.0.8" />
-    <PackageReference Include="Silmoon.Extension" Version="2.0.3" />
+    <PackageReference Include="Silmoon" Version="3.0.0" />
+    <PackageReference Include="Silmoon.Extensions" Version="3.0.0" />
   </ItemGroup>
 
 </Project>
