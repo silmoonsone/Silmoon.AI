@@ -10,7 +10,33 @@ public class Request
     [JsonProperty("messages")]
     public MessageContent[] Messages { get; set; }
     [JsonProperty("stream")]
-    public bool Stream { get; set; }
+    public bool? Stream { get; set; }
+    [JsonProperty("temperature")]
+    public double? Temperature { get; set; }
+    [JsonProperty("top_p")]
+    public double? TopP { get; set; }
+    [JsonProperty("top_k")]
+    public int? TopK { get; set; }
+    [JsonProperty("enable_thinking")]
+    public bool? EnableThinking { get; set; }
+    [JsonProperty("reasoning_effort")]
+    public string? ReasoningEffort { get; set; }
+    [JsonProperty("enable_search")]
+    public bool EnableSearch { get; set; }
+
+    public void SetEnableThinking(bool enableThinking)
+    {
+        if (enableThinking)
+        {
+            EnableThinking = true;
+            ReasoningEffort = "medium";
+        }
+        else
+        {
+            EnableThinking = false;
+            ReasoningEffort = "none";
+        }
+    }
 
     public Request(string model, MessageContent[] messages, bool stream = true)
     {

@@ -13,6 +13,7 @@ namespace Silmoon.AI.HostingTest.Services
 {
     public class SilmoonConfigureServiceImpl : SilmoonConfigureService
     {
+        public string AIApiUrl { get; set; }
         public string AIKey { get; set; }
         public string AIModelName { get; set; }
         public Dictionary<string, string> SystemPrompts { get; set; } = [];
@@ -23,7 +24,7 @@ namespace Silmoon.AI.HostingTest.Services
             Logger = logger;
             Logger.LogInformation($"当前配置文件{CurrentConfigFilePath}");
 
-
+            AIApiUrl = ConfigJson["aiApiUrl"]?.Value<string>();
             AIKey = ConfigJson["aiKey"]?.Value<string>();
             AIModelName = ConfigJson["aiModelName"]?.Value<string>();
 

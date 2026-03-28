@@ -17,7 +17,8 @@ public class ClientService : IHostedService
         ApplicationLifetime = applicationLifetime;
         ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
-        Client = new Client("https://dashscope.aliyuncs.com/compatible-mode/v1", SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
+        // Client = new Client("https://dashscope.aliyuncs.com/compatible-mode/v1", SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
+        Client = new Client(SilmoonConfigureService.AIApiUrl, SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
     }
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -66,7 +67,8 @@ public class ClientService : IHostedService
                         List<Chunk> chunks = [];
                         await foreach (var chunk in Client.CompletionsStreamAsync(input, true, chunks))
                         {
-                            chunk.Choices.Each(x => Console.Write(x?.Delta?.Content));
+                            chunk.Choices.Each(x => Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.Gray));
+                            chunk.Choices.Each(x => Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White));
                         }
                         var result = Result.Create([.. chunks]);
                         Console.WriteLine($"\nFinishReason={result.FinishReason}");
@@ -74,7 +76,7 @@ public class ClientService : IHostedService
                     else
                     {
                         Response response = await Client.CompletionsAsync(input);
-                        response.Choices.Each(x => Console.Write(x?.Message?.Content));
+                        response.Choices.Each(x => Console.WriteWithColor(x?.Message?.Content, ConsoleColor.White));
                         Console.WriteLine($"\nFinishReason={response.Choices[0].FinishReason}");
                     }
                     Console.WriteLine();

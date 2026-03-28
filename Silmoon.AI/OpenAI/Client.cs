@@ -40,6 +40,8 @@ public class Client : IClient
     //     var result = await HttpClient.CompletionsAsync(ApiUrl + "/chat/completions", request);
     //     return true.ToStateSet(result);
     // }
+
+
     public async IAsyncEnumerable<Chunk> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
     {
         model ??= Model;
@@ -48,6 +50,9 @@ public class Client : IClient
 
         if (withHistory) request = new Request(model, [.. MessageHistory, MessageContent.Create(Role.User, content)]);
         else request = new Request(model, [MessageContent.Create(Role.User, content)]);
+
+        request.SetEnableThinking(true);
+        request.EnableSearch = true;
 
         await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
         {
@@ -65,7 +70,6 @@ public class Client : IClient
 
         if (result.FinishReason == "stop") yield break;
     }
-
     public async Task<Response> CompletionsAsync(string content, bool withHistory = true, string model = null)
     {
         model ??= Model;

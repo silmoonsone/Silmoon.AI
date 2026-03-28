@@ -45,9 +45,9 @@ public class SseHttpClient : HttpClient
     {
         request.Stream = true;
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-        var jsonString = request.ToJsonString();
+        var jsonString = request.ToJsonString(serializerSettings);
 
-        // Console.WriteLine($"Request JSON: {jsonString}");
+        Console.WriteLine($"Request JSON: {jsonString}");
 
         httpRequest.Content = new StringContent(jsonString, Encoding.UTF8, "application/json");
         var response = await SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
@@ -58,6 +58,7 @@ public class SseHttpClient : HttpClient
             string? line;
             while ((line = await reader.ReadLineAsync()) != null)
             {
+                // Console.WriteLine($"{line}");
                 if (line.StartsWith("data:"))
                 {
                     var json = line[5..].Trim();

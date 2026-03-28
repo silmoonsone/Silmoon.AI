@@ -10,4 +10,9 @@ public class Delta
     public Role? Role { get; set; }
     [JsonProperty("content")]
     public string Content { get; set; }
+    [JsonProperty("reasoning")]
+    public string Reasoning { get; set; }
+    [JsonProperty("reasoning_content")]
+    public string ReasoningContent { get; set; }
+    public string GetThinking() => ReasoningContent ?? Reasoning ?? null;
 }
