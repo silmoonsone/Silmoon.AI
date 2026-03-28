@@ -1,0 +1,85 @@
+using System;
+using Microsoft.Extensions.Hosting;
+using Silmoon.AI.Enums;
+using Silmoon.AI.OpenAI;
+using Silmoon.Extensions;
+using Silmoon.Extensions.Hosting.Interfaces;
+
+namespace Silmoon.AI.HostingTest.Services;
+
+public class ClientService : IHostedService
+{
+    Client Client { get; set; }
+    SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
+    IHostApplicationLifetime ApplicationLifetime { get; set; }
+    public ClientService(ISilmoonConfigureService silmoonConfigureService, IHostApplicationLifetime applicationLifetime)
+    {
+        ApplicationLifetime = applicationLifetime;
+        ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
+        SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
+        Client = new Client("https://dashscope.aliyuncs.com/compatible-mode/v1", SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
+    }
+    public Task StartAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public Task StopAsync(CancellationToken cancellationToken)
+    {
+        return Task.CompletedTask;
+    }
+
+    public async Task Start(bool stream = true)
+    {
+        await Task.Run(async () =>
+        {
+            await Task.Delay(500);
+            while (true)
+            {
+                Console.Write(Role.User + ": ");
+                string input = Console.ReadLine();
+                if (input.IsNullOrEmpty()) continue;
+                if (input.FirstOrDefault() == '@')
+                {
+                    string command = input[1..].Trim();
+                    switch (command)
+                    {
+                        case "clear":
+                            Client.ClearHistory();
+                            Console.WriteLine("Message history cleared.");
+                            break;
+                        case "exit":
+                            Console.WriteLine("Exiting application...");
+                            ApplicationLifetime.StopApplication();
+                            return;
+                        default:
+                            Console.WriteLine($"Unknown command: {command}");
+                            break;
+                    }
+                }
+                else
+                {
+                    Console.Write(Role.Assistant + ": ");
+
+                    if (stream)
+                    {
+                        List<Chunk> chunks = [];
+                        await foreach (var chunk in Client.CompletionsStreamAsync(input, true, chunks))
+                        {
+                            chunk.Choices.Each(x => Console.Write(x?.Delta?.Content));
+                        }
+                        var result = Result.Create([.. chunks]);
+                        Console.WriteLine($"\nFinishReason={result.FinishReason}");
+                    }
+                    else
+                    {
+                        Response response = await Client.CompletionsAsync(input);
+                        response.Choices.Each(x => Console.Write(x?.Message?.Content));
+                        Console.WriteLine($"\nFinishReason={response.Choices[0].FinishReason}");
+                    }
+                    Console.WriteLine();
+                }
+            }
+        });
+    }
+}

@@ -11,4 +11,9 @@
     <PackageReference Include="Silmoon.Extensions" Version="3.0.0" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Folder Include="Enums/" />
+    <Folder Include="Network/" />
+  </ItemGroup>
+
 </Project>

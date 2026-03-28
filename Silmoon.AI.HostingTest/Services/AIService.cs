@@ -75,38 +75,50 @@ namespace Silmoon.AI.HostingTest.Services
 
                         chatHistory.Add(new ChatMessage(ChatRole.User, input));
 
-                        var chatOptions = new ChatOptions
+                        try
                         {
-                            Tools = [
-                                AIFunctionFactory.Create(PriceTool.GetPrice, "get_price", "获取指定 symbol/ticker（如股票代码、加密货币代码等）的当前价格"),
-                                AIFunctionFactory.Create(PriceTool.GetPrice2, "get_price_2", "获取指定 symbol/ticker（如股票代码、加密货币代码等）的当前价格"),
-                                ]
-                        };
-
-                        var reply = string.Empty;
-                        Console.WriteLine("<<<START>>>");
-                        await foreach (ChatResponseUpdate update in ChatClient.GetStreamingResponseAsync(chatHistory, chatOptions))
-                        {
-                            OpenAI.Chat.StreamingChatCompletionUpdate update1 = update.RawRepresentation as OpenAI.Chat.StreamingChatCompletionUpdate;
-                            //Console.WriteLine(">" + update1?.ToolCallUpdates.Count);
-                            //Console.WriteLine(">" + update.FinishReason);
-                            if (update1?.ToolCallUpdates != null)
+                            var chatOptions = new ChatOptions
                             {
-                                if (update1?.ToolCallUpdates.Count > 0 || update.FinishReason == ChatFinishReason.ToolCalls)
+                                Tools = [
+                                    AIFunctionFactory.Create(PriceTool.GetPrice, "get_price", "获取指定 symbol/ticker（如股票代码、加密货币代码等）的当前价格"),
+                                    AIFunctionFactory.Create(PriceTool.GetPrice2, "get_price_2", "获取指定 symbol/ticker（如股票代码、加密货币代码等）的当前价格"),
+                                ],
+                            };
+                            //chatOptions.AdditionalProperties = [];
+                            //chatOptions.AdditionalProperties["enable_thinking"] = true;
+                            //chatOptions.AdditionalProperties["enable_search"] = true;
+
+
+                            var reply = string.Empty;
+                            Console.WriteLine("<<<START>>>");
+
+                            await foreach (ChatResponseUpdate update in ChatClient.GetStreamingResponseAsync(chatHistory, chatOptions))
+                            {
+                                global::OpenAI.Chat.StreamingChatCompletionUpdate streamingChatCompletionUpdate = update.RawRepresentation as global::OpenAI.Chat.StreamingChatCompletionUpdate;
+                                //Console.WriteLine(">" + streamingChatCompletionUpdate?.ToolCallUpdates.Count);
+                                //Console.WriteLine(">" + update.FinishReason);
+                                if (streamingChatCompletionUpdate?.ToolCallUpdates != null)
                                 {
-                                    //foreach (var toolCall in update1.ToolCallUpdates)
-                                    //{
-                                    //    Console.WriteLine($"工具调用：{toolCall?.FunctionName}，参数：{toolCall?.FunctionArgumentsUpdate}");
-                                    //}
-                                    continue;
+                                    if (streamingChatCompletionUpdate?.ToolCallUpdates.Count > 0 || update.FinishReason == ChatFinishReason.ToolCalls)
+                                    {
+                                        //foreach (var toolCall in streamingChatCompletionUpdate.ToolCallUpdates)
+                                        //{
+                                        //    Console.WriteLine($"TOOL > 工具调用：{toolCall?.FunctionName}，参数：{toolCall?.FunctionArgumentsUpdate}");
+                                        //}
+                                        continue;
+                                    }
                                 }
+                                reply += update.Text;
+                                Console.Write(update);
                             }
-                            reply += update.Text;
-                            Console.Write(update);
+                            chatHistory.Add(new ChatMessage(ChatRole.Assistant, reply.Trim()));
+                            Console.WriteLine();
+                            Console.WriteLine("<<<END>>>");
                         }
-                        chatHistory.Add(new ChatMessage(ChatRole.Assistant, reply.Trim()));
-                        Console.WriteLine();
-                        Console.WriteLine("<<<END>>>");
+                        catch (Exception ex)
+                        {
+                            Console.WriteLine($"发生错误：{ex}");
+                        }
                     }
                 }
             });
