@@ -10,4 +10,6 @@ public class Message<T>
     public Role Role { get; set; }
     [JsonProperty("content")]
     public T Content { get; set; }
+    [JsonProperty("tool_calls")]
+    public List<ToolCall> ToolCalls { get; set; }
 }

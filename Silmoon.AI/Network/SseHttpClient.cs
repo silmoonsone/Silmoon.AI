@@ -20,9 +20,9 @@ public class SseHttpClient : HttpClient
         request.Stream = false;
         List<Chunk> chunks = [];
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-        var jsonString = request.ToJsonString();
+        var jsonString = request.ToJsonString(serializerSettings);
 
-        // Console.WriteLine($"Request JSON: {jsonString}");
+        //Console.WriteLine($"Request JSON: {jsonString}\r\n");
 
         httpRequest.Content = new StringContent(jsonString, Encoding.UTF8, "application/json");
         var response = await SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
@@ -31,13 +31,14 @@ public class SseHttpClient : HttpClient
             using var stream = await response.Content.ReadAsStreamAsync();
             using var reader = new StreamReader(stream);
             var json = await reader.ReadToEndAsync();
+            //Console.WriteLine(json);
             Response responseData = JsonConvert.DeserializeObject<Response>(json, serializerSettings);
             return true.ToStateSet(responseData);
         }
         else
         {
             var errorContent = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"Error response: {errorContent}");
+            //Console.WriteLine($"Error response: {errorContent}");
             return false.ToStateSet<Response>(null, $"HTTP error: {response.StatusCode}, Content: {errorContent}");
         }
     }
@@ -47,7 +48,7 @@ public class SseHttpClient : HttpClient
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
         var jsonString = request.ToJsonString(serializerSettings);
 
-        Console.WriteLine($"Request JSON: {jsonString}");
+        //Console.WriteLine($"Request JSON: {jsonString}");
 
         httpRequest.Content = new StringContent(jsonString, Encoding.UTF8, "application/json");
         var response = await SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
@@ -71,7 +72,7 @@ public class SseHttpClient : HttpClient
         else
         {
             var errorContent = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"Error response: {errorContent}");
+            //Console.WriteLine($"Error response: {errorContent}");
             yield break;
         }
     }

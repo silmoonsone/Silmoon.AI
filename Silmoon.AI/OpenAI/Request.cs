@@ -23,6 +23,8 @@ public class Request
     public string? ReasoningEffort { get; set; }
     [JsonProperty("enable_search")]
     public bool EnableSearch { get; set; }
+    [JsonProperty("tools")]
+    public List<Tool> Tools { get; set; } = [];
 
     public void SetEnableThinking(bool enableThinking)
     {

@@ -11,4 +11,6 @@ public class ChunkChoice
     public Delta Delta { get; set; }
     [JsonProperty("finish_reason")]
     public string FinishReason { get; set; }
+    [JsonProperty("tool_calls")]
+    public List<ToolCall> ToolCalls { get; set; }
 }

@@ -32,27 +32,55 @@ public class Client : IClient
     {
         MessageHistory.Clear();
     }
-    // public async Task<StateSet<bool, Result>> CompletionsAsync(string content, string model = null)
-    // {
-    //     model ??= Model;
-    //     var request = new Request(model, [MessageContent.Create(Role.User, content)], true);
-    //     List<Chunk> responses = [];
-    //     var result = await HttpClient.CompletionsAsync(ApiUrl + "/chat/completions", request);
-    //     return true.ToStateSet(result);
-    // }
 
 
     public async IAsyncEnumerable<Chunk> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
     {
         model ??= Model;
-        Request request;
         chunks ??= [];
 
+        Request request;
         if (withHistory) request = new Request(model, [.. MessageHistory, MessageContent.Create(Role.User, content)]);
         else request = new Request(model, [MessageContent.Create(Role.User, content)]);
 
-        request.SetEnableThinking(true);
-        request.EnableSearch = true;
+        request.SetEnableThinking(false);
+        request.EnableSearch = false;
+        request.Tools = [
+            new Tool(){
+                Type = "function",
+                Function = new ToolFunction()
+                {
+                    Name = "QuoteTool",
+                    Description = "A tool to inquery quotes for symbol or product code.",
+                    Parameters = new ToolParameters(){
+                        Type = "object",
+                        Properties = new Dictionary<string, ToolParameterProperty>(){
+                            {
+                                "symbol", new ToolParameterProperty(){ Type = "string", Description = "The symbol or product code to query quotes for." }
+                            },
+                        },
+                        Required = ["symbol"],
+                    }
+                }
+            },
+            new Tool(){
+                Type = "function",
+                Function = new ToolFunction()
+                {
+                    Name = "Control",
+                    Description = "A tool to control trading client.",
+                    Parameters = new ToolParameters(){
+                        Type = "object",
+                        Properties = new Dictionary<string, ToolParameterProperty>(){
+                            {
+                                "action", new ToolParameterProperty(){ Type = "string", Description = "The action to perform on the trading client.", Enum = ["start", "stop", "pause", "resume"] }
+                            },
+                        },
+                        Required = ["action"],
+                    }
+                }
+            }
+        ];
 
         await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
         {
@@ -77,6 +105,28 @@ public class Client : IClient
 
         if (withHistory) request = new Request(model, [.. MessageHistory, MessageContent.Create(Role.User, content)]);
         else request = new Request(model, [MessageContent.Create(Role.User, content)]);
+
+        request.SetEnableThinking(false);
+        request.EnableSearch = false;
+        request.Tools = [
+            new Tool(){
+                Type = "function",
+                Function = new ToolFunction()
+                {
+                    Name = "QuoteTool",
+                    Description = "A tool to inquery quotes for symbol or product code.",
+                    Parameters = new ToolParameters(){
+                        Type = "object",
+                        Properties = new Dictionary<string, ToolParameterProperty>(){
+                            {
+                                "symbol", new ToolParameterProperty(){ Type = "string", Description = "The symbol or product code to query quotes for." }
+                            }
+                        }
+                    }
+                }
+            }
+        ];
+
 
         var response = await HttpClient.CompletionsAsync(ApiUrl + "/chat/completions", request);
 

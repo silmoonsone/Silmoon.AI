@@ -67,17 +67,29 @@ public class ClientService : IHostedService
                         List<Chunk> chunks = [];
                         await foreach (var chunk in Client.CompletionsStreamAsync(input, true, chunks))
                         {
-                            chunk.Choices.Each(x => Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.Gray));
-                            chunk.Choices.Each(x => Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White));
+                            chunk.Choices.Each(x =>
+                            {
+                                if (x.Delta?.ToolCalls is not null)
+                                {
+                                    Console.Write(".");
+                                }
+                                else
+                                {
+                                    Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.White);
+                                    Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
+                                }
+                            });
                         }
                         var result = Result.Create([.. chunks]);
                         Console.WriteLine($"\nFinishReason={result.FinishReason}");
+                        if (result.FinishReason == "tool_calls") Console.WriteWithColor(result.ToolCalls.ToFormattedJsonString(), ConsoleColor.DarkYellow);
                     }
                     else
                     {
                         Response response = await Client.CompletionsAsync(input);
                         response.Choices.Each(x => Console.WriteWithColor(x?.Message?.Content, ConsoleColor.White));
                         Console.WriteLine($"\nFinishReason={response.Choices[0].FinishReason}");
+                        if (response.Choices[0].FinishReason == "tool_calls") Console.WriteWithColor(response.Choices[0].Message.ToolCalls?.ToFormattedJsonString(), ConsoleColor.DarkYellow);
                     }
                     Console.WriteLine();
                 }

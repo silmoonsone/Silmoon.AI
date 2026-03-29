@@ -14,5 +14,7 @@ public class Delta
     public string Reasoning { get; set; }
     [JsonProperty("reasoning_content")]
     public string ReasoningContent { get; set; }
+    [JsonProperty("tool_calls")]
+    public List<ToolCall> ToolCalls { get; set; }
     public string GetThinking() => ReasoningContent ?? Reasoning ?? null;
 }
