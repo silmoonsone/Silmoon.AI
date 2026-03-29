@@ -42,7 +42,7 @@ public class SseHttpClient : HttpClient
             return false.ToStateSet<Response>(null, $"HTTP error: {response.StatusCode}, Content: {errorContent}");
         }
     }
-    public async IAsyncEnumerable<Chunk> CompletionsStreamAsync(string url, Request request)
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string url, Request request)
     {
         request.Stream = true;
         var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
@@ -59,13 +59,13 @@ public class SseHttpClient : HttpClient
             string? line;
             while ((line = await reader.ReadLineAsync()) != null)
             {
-                // Console.WriteLine($"{line}");
+                //Console.WriteLine($"{line}");
                 if (line.StartsWith("data:"))
                 {
                     var json = line[5..].Trim();
                     if (json == "[DONE]") break;
                     Chunk chunkData = JsonConvert.DeserializeObject<Chunk>(json, serializerSettings);
-                    yield return chunkData;
+                    yield return true.ToStateSet(chunkData);
                 }
             }
         }
@@ -73,7 +73,7 @@ public class SseHttpClient : HttpClient
         {
             var errorContent = await response.Content.ReadAsStringAsync();
             //Console.WriteLine($"Error response: {errorContent}");
-            yield break;
+            yield return false.ToStateSet<Chunk>(null, $"HTTP error: {response.StatusCode}, Content: {errorContent}");
         }
     }
 }

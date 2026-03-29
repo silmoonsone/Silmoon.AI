@@ -67,18 +67,19 @@ public class ClientService : IHostedService
                         List<Chunk> chunks = [];
                         await foreach (var chunk in Client.CompletionsStreamAsync(input, true, chunks))
                         {
-                            chunk.Choices.Each(x =>
+                            if (chunk.State)
                             {
-                                if (x.Delta?.ToolCalls is not null)
+                                chunk.Data.Choices.Each(x =>
                                 {
-                                    Console.Write(".");
-                                }
-                                else
-                                {
-                                    Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.White);
-                                    Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
-                                }
-                            });
+                                    if (x.Delta?.ToolCalls is not null) Console.Write(".");
+                                    else
+                                    {
+                                        Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.DarkGray);
+                                        Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
+                                    }
+                                });
+                            }
+                            else Console.WriteLineWithColor(chunk.Message, ConsoleColor.Red);
                         }
                         var result = Result.Create([.. chunks]);
                         Console.WriteLine($"\nFinishReason={result.FinishReason}");

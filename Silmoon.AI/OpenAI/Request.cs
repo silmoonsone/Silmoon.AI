@@ -31,7 +31,8 @@ public class Request
         if (enableThinking)
         {
             EnableThinking = true;
-            ReasoningEffort = "medium";
+            ReasoningEffort = "high";
+            ReasoningEffort = null;
         }
         else
         {

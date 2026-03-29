@@ -34,7 +34,7 @@ public class Client : IClient
     }
 
 
-    public async IAsyncEnumerable<Chunk> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
     {
         model ??= Model;
         chunks ??= [];
@@ -82,15 +82,21 @@ public class Client : IClient
             }
         ];
 
+        bool error = false;
         await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
         {
-            if (withHistory) chunks.Add(chunk);
+            if (withHistory)
+            {
+                if (chunk.State) chunks.Add(chunk.Data);
+                else error = true;
+            }
+
             yield return chunk;
         }
 
         var result = Result.Create([.. chunks]);
 
-        if (withHistory)
+        if (!error && withHistory)
         {
             MessageHistory.Add(request.Messages.FirstOrDefault());
             MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
