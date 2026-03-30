@@ -1,7 +1,7 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
 
-namespace Silmoon.AI.OpenAI;
+namespace Silmoon.AI.Client.OpenAI.Models;
 
 public class Tool
 {

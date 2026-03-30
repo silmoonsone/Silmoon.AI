@@ -1,13 +1,13 @@
 using System;
-using Silmoon.AI.Enums;
-using Silmoon.AI.Interfaces;
-using Silmoon.AI.Network;
+using Silmoon.AI.Client.OpenAI.Enums;
+using Silmoon.AI.Client.OpenAI.Interfaces;
+using Silmoon.AI.Client.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 
-namespace Silmoon.AI.OpenAI;
+namespace Silmoon.AI.Client.OpenAI;
 
-public class Client : IClient
+public class NativeApiClient : INativeApiClient
 {
     public string ApiUrl { get; set; }
     public string ApiKey { get; set; }
@@ -15,7 +15,7 @@ public class Client : IClient
     public string Model { get; set; } = "qwen-plus";
     public List<MessageContent> MessageHistory { get; set; } = [];
 
-    public Client(string apiUrl, string apiKey, string model)
+    public NativeApiClient(string apiUrl, string apiKey, string model)
     {
         ApiUrl = apiUrl;
         ApiKey = apiKey;

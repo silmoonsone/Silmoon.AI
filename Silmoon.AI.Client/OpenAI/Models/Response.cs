@@ -1,12 +1,12 @@
 using System;
 using Newtonsoft.Json;
 
-namespace Silmoon.AI.OpenAI;
+namespace Silmoon.AI.Client.OpenAI.Models;
 
-public class Chunk
+public class Response
 {
     [JsonProperty("choices")]
-    public ChunkChoice[] Choices { get; set; }
+    public Choice[] Choices { get; set; }
     [JsonProperty("model")]
     public string Model { get; set; }
     [JsonProperty("id")]
@@ -15,4 +15,5 @@ public class Chunk
     public string Object { get; set; }
     [JsonProperty("created")]
     public int Created { get; set; }
+
 }

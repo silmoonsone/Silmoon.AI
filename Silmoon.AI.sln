@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.14.36310.24
+# Visual Studio Version 18
+VisualStudioVersion = 18.4.11620.152 stable
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI", "Silmoon.AI\Silmoon.AI.csproj", "{252488FF-FB2F-4FB1-8F8D-72D4F0781E1B}"
 EndProject
@@ -14,6 +14,8 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "解决方案项", "解决�
 		.gitattributes = .gitattributes
 		.gitignore = .gitignore
 	EndProjectSection
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.Client", "Silmoon.AI.Client\Silmoon.AI.Client.csproj", "{B7EE48E6-D509-47DC-902F-FFBE32B93854}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,6 +31,10 @@ Global
 		{02F1D6BD-5E7D-4961-8281-6CEACEDD9D99}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{02F1D6BD-5E7D-4961-8281-6CEACEDD9D99}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{02F1D6BD-5E7D-4961-8281-6CEACEDD9D99}.Release|Any CPU.Build.0 = Release|Any CPU
+		{B7EE48E6-D509-47DC-902F-FFBE32B93854}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{B7EE48E6-D509-47DC-902F-FFBE32B93854}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{B7EE48E6-D509-47DC-902F-FFBE32B93854}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{B7EE48E6-D509-47DC-902F-FFBE32B93854}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

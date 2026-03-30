@@ -2,11 +2,11 @@ using System;
 using System.Net;
 using System.Text;
 using Newtonsoft.Json;
-using Silmoon.AI.OpenAI;
+using Silmoon.AI.Client.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 
-namespace Silmoon.AI.Network;
+namespace Silmoon.AI.Client.OpenAI;
 
 public class SseHttpClient : HttpClient
 {

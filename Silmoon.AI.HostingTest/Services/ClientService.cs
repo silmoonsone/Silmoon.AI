@@ -1,7 +1,8 @@
 using System;
 using Microsoft.Extensions.Hosting;
-using Silmoon.AI.Enums;
-using Silmoon.AI.OpenAI;
+using Silmoon.AI.Client.OpenAI;
+using Silmoon.AI.Client.OpenAI.Enums;
+using Silmoon.AI.Client.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 
@@ -9,7 +10,7 @@ namespace Silmoon.AI.HostingTest.Services;
 
 public class ClientService : IHostedService
 {
-    Client Client { get; set; }
+    NativeApiClient NativeApiClient { get; set; }
     SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
     IHostApplicationLifetime ApplicationLifetime { get; set; }
     public ClientService(ISilmoonConfigureService silmoonConfigureService, IHostApplicationLifetime applicationLifetime)
@@ -18,7 +19,7 @@ public class ClientService : IHostedService
         ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
         // Client = new Client("https://dashscope.aliyuncs.com/compatible-mode/v1", SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
-        Client = new Client(SilmoonConfigureService.AIApiUrl, SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
+        NativeApiClient = new NativeApiClient(SilmoonConfigureService.AIApiUrl, SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
     }
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -46,7 +47,7 @@ public class ClientService : IHostedService
                     switch (command)
                     {
                         case "clear":
-                            Client.ClearHistory();
+                            NativeApiClient.ClearHistory();
                             Console.WriteLine("Message history cleared.");
                             break;
                         case "exit":
@@ -65,7 +66,7 @@ public class ClientService : IHostedService
                     if (stream)
                     {
                         List<Chunk> chunks = [];
-                        await foreach (var chunk in Client.CompletionsStreamAsync(input, true, chunks))
+                        await foreach (var chunk in NativeApiClient.CompletionsStreamAsync(input, true, chunks))
                         {
                             if (chunk.State)
                             {
@@ -87,7 +88,7 @@ public class ClientService : IHostedService
                     }
                     else
                     {
-                        Response response = await Client.CompletionsAsync(input);
+                        Response response = await NativeApiClient.CompletionsAsync(input);
                         response.Choices.Each(x => Console.WriteWithColor(x?.Message?.Content, ConsoleColor.White));
                         Console.WriteLine($"\nFinishReason={response.Choices[0].FinishReason}");
                         if (response.Choices[0].FinishReason == "tool_calls") Console.WriteWithColor(response.Choices[0].Message.ToolCalls?.ToFormattedJsonString(), ConsoleColor.DarkYellow);

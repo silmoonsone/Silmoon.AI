@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Silmoon.AI\Silmoon.AI.csproj" />
+    <ProjectReference Include="..\Silmoon.AI.Client\Silmoon.AI.Client.csproj" />
   </ItemGroup>
 
   <ItemGroup>

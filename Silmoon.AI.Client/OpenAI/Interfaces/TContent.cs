@@ -1,6 +1,6 @@
 using System;
 
-namespace Silmoon.AI.Interfaces;
+namespace Silmoon.AI.Client.OpenAI.Interfaces;
 
 public interface TContent
 {
