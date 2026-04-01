@@ -14,12 +14,14 @@ public class NativeApiClient : INativeApiClient
     SseHttpClient HttpClient { get; set; }
     public string Model { get; set; } = "qwen-plus";
     public List<MessageContent> MessageHistory { get; set; } = [];
-
-    public NativeApiClient(string apiUrl, string apiKey, string model)
+    public string SystemPrompt { get; set; }
+    public NativeApiClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
     {
         ApiUrl = apiUrl;
         ApiKey = apiKey;
         Model = model;
+        SystemPrompt = systemPrompt;
+        if (!SystemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, SystemPrompt));
         BuildHttpClient();
     }
     void BuildHttpClient()
@@ -85,22 +87,38 @@ public class NativeApiClient : INativeApiClient
         bool error = false;
         await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
         {
-            if (withHistory)
-            {
-                if (chunk.State) chunks.Add(chunk.Data);
-                else error = true;
-            }
+            if (chunk.State) chunks.Add(chunk.Data);
+            else error = true;
 
             yield return chunk;
         }
 
         var result = Result.Create([.. chunks]);
 
-        if (!error && withHistory)
+        if (withHistory && !error)
         {
             MessageHistory.Add(request.Messages.FirstOrDefault());
             MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
         }
+
+        if (result.FinishReason == "stop") yield break;
+    }
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent[] messageHistory, List<Chunk> chunks = null, string model = null)
+    {
+        model ??= Model;
+        chunks ??= [];
+
+        var request = new Request(model, messageHistory);
+        request.SetEnableThinking(false);
+        request.EnableSearch = false;
+
+        await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
+        {
+            if (chunk.State) chunks.Add(chunk.Data);
+            yield return chunk;
+        }
+
+        var result = Result.Create([.. chunks]);
 
         if (result.FinishReason == "stop") yield break;
     }
