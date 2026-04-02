@@ -39,7 +39,6 @@ public class NativeApiClient : INativeApiClient
     public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
     {
         model ??= Model;
-        chunks ??= [];
 
         Request request;
         if (withHistory) request = new Request(model, [.. MessageHistory, MessageContent.Create(Role.User, content)]);
@@ -84,24 +83,17 @@ public class NativeApiClient : INativeApiClient
             }
         ];
 
-        bool error = false;
+        if (withHistory) MessageHistory.Add(request.Messages.FirstOrDefault());
+        chunks ??= [];
         await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
         {
             if (chunk.State) chunks.Add(chunk.Data);
-            else error = true;
-
             yield return chunk;
         }
 
         var result = Result.Create([.. chunks]);
 
-        if (withHistory && !error)
-        {
-            MessageHistory.Add(request.Messages.FirstOrDefault());
-            MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
-        }
-
-        if (result.FinishReason == "stop") yield break;
+        if (withHistory && result.FinishReason == "stop") MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
     }
     public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent[] messageHistory, List<Chunk> chunks = null, string model = null)
     {
