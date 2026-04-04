@@ -15,7 +15,7 @@ namespace Silmoon.AI.WinFormTest
 {
     public partial class OpenAIClientTestForm : Form
     {
-        NativeApiClient NativeApiClient { get; set; }
+        NativeChatClient NativeApiClient { get; set; }
         SilmoonConfigureService ConfigureService { get; set; }
 
         public OpenAIClientTestForm()
@@ -36,7 +36,7 @@ namespace Silmoon.AI.WinFormTest
             var userPrompt = textBox3.Text;
             textBox2.Text = string.Empty;
             textBox3.Text = string.Empty;
-            NativeApiClient = new NativeApiClient(ConfigureService.ConfigJson.Value<string>("aiApiUrl"), ConfigureService.ConfigJson.Value<string>("aiKey"), ConfigureService.ConfigJson.Value<string>("aiModelName"), systemPrompt);
+            NativeApiClient = new NativeChatClient(ConfigureService.ConfigJson.Value<string>("aiApiUrl"), ConfigureService.ConfigJson.Value<string>("aiKey"), ConfigureService.ConfigJson.Value<string>("aiModelName"), systemPrompt);
 
             List<Chunk> chunks = [];
             await foreach (var chunk in NativeApiClient.CompletionsStreamAsync(userPrompt, true, chunks))

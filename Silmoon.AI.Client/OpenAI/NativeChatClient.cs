@@ -9,7 +9,7 @@ using Silmoon.Models;
 
 namespace Silmoon.AI.Client.OpenAI;
 
-public class NativeApiClient : INativeApiClient
+public class NativeChatClient : INativeApiClient
 {
     public string ApiUrl { get; set; }
     public string ApiKey { get; set; }
@@ -17,7 +17,7 @@ public class NativeApiClient : INativeApiClient
     public string Model { get; set; } = "qwen-plus";
     public List<MessageContent> MessageHistory { get; set; } = [];
     public string SystemPrompt { get; set; }
-    public NativeApiClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
+    public NativeChatClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
     {
         ApiUrl = apiUrl;
         ApiKey = apiKey;
