@@ -13,8 +13,8 @@ public class NativeChatClient : INativeApiClient
 {
     public string ApiUrl { get; set; }
     public string ApiKey { get; set; }
-    SseHttpClient HttpClient { get; set; }
     public string Model { get; set; } = "qwen-plus";
+    SseHttpClient HttpClient { get; set; }
     public List<MessageContent> MessageHistory { get; set; } = [];
     public string SystemPrompt { get; set; }
     public NativeChatClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
@@ -75,34 +75,26 @@ public class NativeChatClient : INativeApiClient
         request.SetEnableThinking(false);
         request.EnableSearch = false;
         request.Tools = [
-            new Tool(){
-                Type = "function",
-                Function = new ToolFunction()
+            new Tool("function"){
+                Function = new ToolFunction("QuoteTool", "A tool to inquery quotes for symbol or product code.")
                 {
-                    Name = "QuoteTool",
-                    Description = "A tool to inquery quotes for symbol or product code.",
                     Parameters = new ToolParameters(){
-                        Type = "object",
                         Properties = new Dictionary<string, ToolParameterProperty>(){
                             {
-                                "symbol", new ToolParameterProperty(){ Type = "string", Description = "The symbol or product code to query quotes for." }
+                                "symbol", new ToolParameterProperty("string", "The symbol or product code to query quotes for.")
                             },
                         },
                         Required = ["symbol"],
                     }
                 }
             },
-            new Tool(){
-                Type = "function",
-                Function = new ToolFunction()
+            new Tool("function"){
+                Function = new ToolFunction("TradingController", "A tool to control trading client.")
                 {
-                    Name = "Control",
-                    Description = "A tool to control trading client.",
                     Parameters = new ToolParameters(){
-                        Type = "object",
                         Properties = new Dictionary<string, ToolParameterProperty>(){
                             {
-                                "action", new ToolParameterProperty(){ Type = "string", Description = "The action to perform on the trading client.", Enum = ["start", "stop", "pause", "resume"] }
+                                "action", new ToolParameterProperty("string", "The action to perform on the trading client.",["start", "stop", "pause", "resume"])
                             },
                         },
                         Required = ["action"],
@@ -142,36 +134,38 @@ public class NativeChatClient : INativeApiClient
                 else content = MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), result.ToolCalls[0].Id);
                 goto send;
             }
-
         }
     }
+
     public async Task<Response> CompletionsAsync(string content, bool withHistory = true, string model = null)
     {
+        return await CompletionsAsync(MessageContent.Create(Role.User, content), withHistory, model);
+    }
+    public async Task<Response> CompletionsAsync(MessageContent content, bool withHistory = true, string model = null)
+    {
         model ??= Model;
+        send:
         Request request;
 
-        if (withHistory) request = new Request(model, [.. MessageHistory, MessageContent.Create(Role.User, content)]);
-        else request = new Request(model, [MessageContent.Create(Role.User, content)]);
+        if (withHistory) request = new Request(model, [.. MessageHistory, content]);
+        else request = new Request(model, [content]);
 
         request.SetEnableThinking(false);
         request.EnableSearch = false;
         request.Tools = [
-            new Tool(){
-                Type = "function",
-                Function = new ToolFunction()
+            new Tool("function"){
+                Function = new ToolFunction("QuoteTool", "A tool to inquery quotes for symbol or product code.")
                 {
-                    Name = "QuoteTool",
-                    Description = "A tool to inquery quotes for symbol or product code.",
                     Parameters = new ToolParameters(){
-                        Type = "object",
                         Properties = new Dictionary<string, ToolParameterProperty>(){
                             {
-                                "symbol", new ToolParameterProperty(){ Type = "string", Description = "The symbol or product code to query quotes for." }
-                            }
-                        }
+                                "symbol", new ToolParameterProperty("string", "The symbol or product code to query quotes for.")
+                            },
+                        },
+                        Required = ["symbol"],
                     }
                 }
-            }
+            },
         ];
 
         if (withHistory) MessageHistory.Add(request.Messages.LastOrDefault());
@@ -184,8 +178,18 @@ public class NativeChatClient : INativeApiClient
             if (firstChoice?.FinishReason == "stop")
                 MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
             else if (firstChoice?.FinishReason == "tool_calls")
+            {
                 MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
+
+                string functionName = firstChoice?.Message?.ToolCalls[0].Function.Name;
+                JObject parameters = JsonConvert.DeserializeObject<JObject>(firstChoice?.Message?.ToolCalls[0].Function.Arguments);
+                var toolCallResult = await ToolCall(functionName, parameters, firstChoice?.Message?.ToolCalls[0].Id);
+                if (toolCallResult.State) content = toolCallResult.Data;
+                else content = MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id);
+                goto send;
+            }
         }
+
 
         return response.Data;
     }

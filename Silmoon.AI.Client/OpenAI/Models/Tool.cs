@@ -8,7 +8,11 @@ public class Tool
     [JsonProperty("type")]
     public string Type { get; set; } = "function";
     [JsonProperty("function")]
-    public ToolFunction Function { get; set; } = new ToolFunction();
+    public ToolFunction Function { get; set; }
+    public Tool(string type)
+    {
+        Type = type;
+    }
 }
 
 public class ToolFunction
@@ -19,6 +23,11 @@ public class ToolFunction
     public string? Description { get; set; }
     [JsonProperty("parameters")]
     public ToolParameters Parameters { get; set; } = new ToolParameters();
+    public ToolFunction(string name, string description)
+    {
+        Name = name;
+        Description = description;
+    }
 }
 
 public class ToolParameters
@@ -43,4 +52,11 @@ public class ToolParameterProperty
     public List<object>? Enum { get; set; }
     [JsonProperty("items")]
     public ToolParameters? Items { get; set; }
+
+    public ToolParameterProperty(string type, string description, List<object> @enum = null)
+    {
+        Type = type;
+        Description = description;
+        Enum = @enum;
+    }
 }
