@@ -12,4 +12,6 @@ public class Message<T>
     public T Content { get; set; }
     [JsonProperty("tool_calls")]
     public List<ToolCall> ToolCalls { get; set; }
+    [JsonProperty("tool_call_id")]
+    public string ToolCallId { get; set; }
 }

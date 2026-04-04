@@ -1,4 +1,6 @@
 using System;
+using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
 using Silmoon.AI.Client.OpenAI.Enums;
 using Silmoon.AI.Client.OpenAI.Interfaces;
 using Silmoon.AI.Client.OpenAI.Models;
@@ -35,14 +37,40 @@ public class NativeApiClient : INativeApiClient
         MessageHistory.Clear();
     }
 
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent[] messageHistory, List<Chunk> chunks = null, string model = null)
+    {
+        model ??= Model;
+        chunks ??= [];
+
+        var request = new Request(model, messageHistory);
+        request.SetEnableThinking(false);
+        request.EnableSearch = false;
+
+        await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
+        {
+            if (chunk.State) chunks.Add(chunk.Data);
+            yield return chunk;
+        }
+
+        var result = Result.Create([.. chunks]);
+
+        if (result.FinishReason == "stop") yield break;
+    }
 
     public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
     {
+        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), withHistory, chunks, model))
+        {
+            yield return chunk;
+        }
+    }
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
+    {
         model ??= Model;
-
+        send:
         Request request;
-        if (withHistory) request = new Request(model, [.. MessageHistory, MessageContent.Create(Role.User, content)]);
-        else request = new Request(model, [MessageContent.Create(Role.User, content)]);
+        if (withHistory) request = new Request(model, [.. MessageHistory, content]);
+        else request = new Request(model, [content]);
 
         request.SetEnableThinking(false);
         request.EnableSearch = false;
@@ -83,36 +111,39 @@ public class NativeApiClient : INativeApiClient
             }
         ];
 
-        if (withHistory) MessageHistory.Add(request.Messages.FirstOrDefault());
+        if (withHistory) MessageHistory.Add(request.Messages.LastOrDefault());
         chunks ??= [];
-        await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
-        {
-            if (chunk.State) chunks.Add(chunk.Data);
-            yield return chunk;
-        }
-
-        var result = Result.Create([.. chunks]);
-
-        if (withHistory && result.FinishReason == "stop") MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
-    }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent[] messageHistory, List<Chunk> chunks = null, string model = null)
-    {
-        model ??= Model;
-        chunks ??= [];
-
-        var request = new Request(model, messageHistory);
-        request.SetEnableThinking(false);
-        request.EnableSearch = false;
+        List<Chunk> OnceChunks = [];
 
         await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
         {
-            if (chunk.State) chunks.Add(chunk.Data);
+            if (chunk.State)
+            {
+                chunks.Add(chunk.Data);
+                OnceChunks.Add(chunk.Data);
+            }
             yield return chunk;
         }
 
-        var result = Result.Create([.. chunks]);
+        var result = Result.Create([.. OnceChunks]);
 
-        if (result.FinishReason == "stop") yield break;
+        if (withHistory)
+        {
+            if (result.FinishReason == "stop")
+                MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
+            else if (result.FinishReason == "tool_calls")
+            {
+                MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
+
+                string functionName = result.ToolCalls[0].Function.Name;
+                JObject parameters = JsonConvert.DeserializeObject<JObject>(result.ToolCalls[0].Function.Arguments);
+                var toolCallResult = await ToolCall(functionName, parameters, result.ToolCalls[0].Id);
+                if (toolCallResult.State) content = toolCallResult.Data;
+                else content = MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), result.ToolCalls[0].Id);
+                goto send;
+            }
+
+        }
     }
     public async Task<Response> CompletionsAsync(string content, bool withHistory = true, string model = null)
     {
@@ -143,15 +174,28 @@ public class NativeApiClient : INativeApiClient
             }
         ];
 
+        if (withHistory) MessageHistory.Add(request.Messages.LastOrDefault());
 
         var response = await HttpClient.CompletionsAsync(ApiUrl + "/chat/completions", request);
 
         if (withHistory)
         {
-            MessageHistory.Add(request.Messages.FirstOrDefault());
-            MessageHistory.Add(MessageContent.Create(Role.Assistant, response.Data.Choices.FirstOrDefault()?.Message?.Content));
+            Choice firstChoice = response.Data.Choices.FirstOrDefault();
+            if (firstChoice?.FinishReason == "stop")
+                MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
+            else if (firstChoice?.FinishReason == "tool_calls")
+                MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
         }
 
         return response.Data;
+    }
+
+
+    public async Task<StateSet<bool, MessageContent>> ToolCall(string functionName, JObject parameters, string toolCallId)
+    {
+        if (parameters["symbol"].Value<string>() == "XAUUSD")
+            return true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
+        else
+            return false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
     }
 }
