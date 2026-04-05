@@ -4,6 +4,7 @@ using Newtonsoft.Json.Linq;
 using Silmoon.AI.Client.OpenAI.Enums;
 using Silmoon.AI.Client.OpenAI.Interfaces;
 using Silmoon.AI.Client.OpenAI.Models;
+using Silmoon.AI.Client.ToolCall;
 using Silmoon.Extensions;
 using Silmoon.Models;
 
@@ -80,9 +81,7 @@ public class NativeChatClient : INativeApiClient
                 {
                     Parameters = new ToolParameters(){
                         Properties = new Dictionary<string, ToolParameterProperty>(){
-                            {
-                                "symbol", new ToolParameterProperty("string", "The symbol or product code to query quotes for.")
-                            },
+                            { "symbol", new ToolParameterProperty("string", "The symbol or product code to query quotes for.") },
                         },
                         Required = ["symbol"],
                     }
@@ -93,14 +92,25 @@ public class NativeChatClient : INativeApiClient
                 {
                     Parameters = new ToolParameters(){
                         Properties = new Dictionary<string, ToolParameterProperty>(){
-                            {
-                                "action", new ToolParameterProperty("string", "The action to perform on the trading client.",["start", "stop", "pause", "resume"])
-                            },
+                            { "action", new ToolParameterProperty("string", "The action to perform on the trading client.",["start", "stop", "pause", "resume"]) },
                         },
                         Required = ["action"],
                     }
                 }
-            }
+            },
+            new Tool("function"){
+                Function = new ToolFunction("CommandTool", "It can execute commands on the local computer and supports Windows, macOS, and Linux. Note that you should not use this tool to execute dangerous commands, including power control, modifying and deleting important files and system files. Some high-risk operations require prompting the user for confirmation before execution.")
+                {
+                    Parameters = new ToolParameters(){
+                        Properties = new Dictionary<string, ToolParameterProperty>(){
+                            { "os", new ToolParameterProperty("string", "The operating system on which to execute the command.", ["windows", "macos", "linux"]) },
+                            { "command", new ToolParameterProperty("string", "The command to execute in cmd or powershell.") },
+                            { "terminalType", new ToolParameterProperty("string", "Which command line should be used in Windows? What parameters are required in Windows? It supports cmd and PowerShell parameters; on other platforms, empty or null parameters are acceptable.", ["cmd", "powershell", null]) },
+                        },
+                        Required = ["os", "command", "terminalType"],
+                    }
+                }
+            },
         ];
 
         if (withHistory) MessageHistory.Add(request.Messages.LastOrDefault());
@@ -197,9 +207,27 @@ public class NativeChatClient : INativeApiClient
 
     public async Task<StateSet<bool, MessageContent>> ToolCall(string functionName, JObject parameters, string toolCallId)
     {
-        if (parameters["symbol"].Value<string>() == "XAUUSD")
-            return true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
-        else
-            return false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
+        try
+        {
+            switch (functionName)
+            {
+                case "QuoteTool":
+                    if (parameters["symbol"].Value<string>() == "XAUUSD")
+                        return true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
+                    else
+                        return false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
+                case "TradingController":
+                    return false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
+                case "CommandTool":
+                    var commandResult = CommandTool.Execute(parameters["os"].Value<string>(), parameters["command"].Value<string>(), parameters["terminalType"].Value<string>());
+                    return true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
+                default:
+                    return false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
+            }
+        }
+        catch (Exception ex)
+        {
+            return false.ToStateSet<MessageContent>(null, $"执行函数 {functionName} 时发生异常: {ex.Message}");
+        }
     }
 }

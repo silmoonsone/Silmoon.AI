@@ -19,7 +19,7 @@ public class ClientService : IHostedService
         ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
         // Client = new Client("https://dashscope.aliyuncs.com/compatible-mode/v1", SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
-        NativeChatClient = new NativeChatClient(SilmoonConfigureService.AIApiUrl, SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
+        NativeChatClient = new NativeChatClient(SilmoonConfigureService.AIApiUrl, SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName, MakeSystemPrompt());
     }
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -28,6 +28,15 @@ public class ClientService : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         return Task.CompletedTask;
+    }
+    public string MakeSystemPrompt()
+    {
+        return $"""
+            你是一个人工智能助手，协助用户完成各种任务，以下是一些关于当前环境的信息：
+            操作系统: {Environment.OSVersion.VersionString}
+            当前目录: {Environment.CurrentDirectory}
+            当前时间: {DateTime.Now}
+            """;
     }
 
     public async Task Start(bool stream = true)
