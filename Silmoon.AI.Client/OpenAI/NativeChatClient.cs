@@ -111,6 +111,19 @@ public class NativeChatClient : INativeApiClient
                     }
                 }
             },
+            new Tool("function"){
+                Function = new ToolFunction("LocalFileSystemTool", "It provides some simple ways to manipulate files without using the command line, which is especially useful when writing large amounts of text and content. It also provides some other operations, but note that it only applies to file operations in user control and prohibits operating system files and system corruption.")
+                {
+                    Parameters = new ToolParameters(){
+                        Properties = new Dictionary<string, ToolParameterProperty>(){
+                            { "action", new ToolParameterProperty("string", "The action to perform on the file system.", ["write", "read"]) },
+                            { "path", new ToolParameterProperty("string", "The path of the file to operate on.") },
+                            { "content", new ToolParameterProperty("string", "The content to write to the file, if applicable.") },
+                        },
+                        Required = ["action", "path", "content"],
+                    }
+                }
+            },
         ];
 
         if (withHistory) MessageHistory.Add(request.Messages.LastOrDefault());
@@ -221,6 +234,9 @@ public class NativeChatClient : INativeApiClient
                 case "CommandTool":
                     var commandResult = CommandTool.Execute(parameters["os"].Value<string>(), parameters["command"].Value<string>(), parameters["terminalType"].Value<string>());
                     return true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
+                case "LocalFileSystemTool":
+                    var fileSystemResult = LocalFileSystemTool.ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"].Value<string>());
+                    return true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
                 default:
                     return false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
             }

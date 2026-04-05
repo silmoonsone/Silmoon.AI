@@ -36,6 +36,8 @@ public class ClientService : IHostedService
             操作系统: {Environment.OSVersion.VersionString}
             当前目录: {Environment.CurrentDirectory}
             当前时间: {DateTime.Now}
+            当前用户: {Environment.UserName}
+            当前用户主目录: {Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}
             """;
     }
 
