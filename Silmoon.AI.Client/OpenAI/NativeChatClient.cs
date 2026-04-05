@@ -14,7 +14,7 @@ public class NativeChatClient : INativeApiClient
 {
     public string ApiUrl { get; set; }
     public string ApiKey { get; set; }
-    public string Model { get; set; } = "qwen-plus";
+    public string Model { get; set; }
     SseHttpClient HttpClient { get; set; }
     public List<MessageContent> MessageHistory { get; set; } = [];
     public string SystemPrompt { get; set; }
@@ -58,14 +58,14 @@ public class NativeChatClient : INativeApiClient
         if (result.FinishReason == "stop") yield break;
     }
 
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
     {
-        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), withHistory, chunks, model))
+        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), withHistory, chunks, model, completionsUrl))
         {
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, bool withHistory = true, List<Chunk> chunks = null, string model = null)
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, bool withHistory = true, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
     {
         model ??= Model;
         send:
@@ -130,7 +130,7 @@ public class NativeChatClient : INativeApiClient
         chunks ??= [];
         List<Chunk> OnceChunks = [];
 
-        await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
+        await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + completionsUrl, request))
         {
             if (chunk.State)
             {
