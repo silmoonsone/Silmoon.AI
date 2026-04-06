@@ -39,7 +39,7 @@ namespace Silmoon.AI.WinFormTest
             NativeApiClient = new NativeChatClient(ConfigureService.ConfigJson.Value<string>("aiApiUrl"), ConfigureService.ConfigJson.Value<string>("aiKey"), ConfigureService.ConfigJson.Value<string>("aiModelName"), systemPrompt);
 
             List<Chunk> chunks = [];
-            await foreach (var chunk in NativeApiClient.CompletionsStreamAsync(userPrompt, true, chunks))
+            await foreach (var chunk in NativeApiClient.CompletionsStreamAsync(userPrompt, chunks))
             {
                 if (chunk.State)
                 {

@@ -76,7 +76,7 @@ public class ClientService : IHostedService
                     if (stream)
                     {
                         List<Chunk> chunks = [];
-                        await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(input, true, chunks))
+                        await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(input, chunks))
                         {
                             if (chunk.State)
                             {
@@ -92,15 +92,16 @@ public class ClientService : IHostedService
                             }
                             else Console.WriteLineWithColor(chunk.Message, ConsoleColor.Red);
                         }
+                        Console.WriteLine();
                         var result = Result.Create([.. chunks]);
-                        Console.WriteLine($"\nFinishReason={result.FinishReason}");
+                        Console.WriteLine($"FinishReason={result.FinishReason}");
                         if (result.FinishReason == "tool_calls") Console.WriteWithColor(result.ToolCalls.ToFormattedJsonString(), ConsoleColor.DarkYellow);
                     }
                     else
                     {
                         Response response = await NativeChatClient.CompletionsAsync(input);
                         response.Choices.Each(x => Console.WriteWithColor(x?.Message?.Content, ConsoleColor.White));
-                        Console.WriteLine($"\nFinishReason={response.Choices[0].FinishReason}");
+                        Console.WriteLine($"FinishReason={response.Choices[0].FinishReason}");
                         if (response.Choices[0].FinishReason == "tool_calls") Console.WriteWithColor(response.Choices[0].Message.ToolCalls?.ToFormattedJsonString(), ConsoleColor.DarkYellow);
                     }
                     Console.WriteLine();

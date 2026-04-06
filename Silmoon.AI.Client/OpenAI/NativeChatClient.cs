@@ -1,4 +1,3 @@
-using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Client.OpenAI.Enums;
@@ -7,6 +6,7 @@ using Silmoon.AI.Client.OpenAI.Models;
 using Silmoon.AI.Client.ToolCall;
 using Silmoon.Extensions;
 using Silmoon.Models;
+using System.Threading.Channels;
 
 namespace Silmoon.AI.Client.OpenAI;
 
@@ -16,17 +16,24 @@ public class NativeChatClient : INativeApiClient
     public string ApiKey { get; set; }
     public string Model { get; set; }
     SseHttpClient HttpClient { get; set; }
+    public bool EnableThinking { get; set; } = false;
+    public bool EnableSearch { get; set; } = false;
     public List<MessageContent> MessageHistory { get; set; } = [];
-    public string SystemPrompt { get; set; }
     public NativeChatClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
     {
         ApiUrl = apiUrl;
         ApiKey = apiKey;
         Model = model;
-        SystemPrompt = systemPrompt;
-        if (!SystemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, SystemPrompt));
+        if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, systemPrompt));
         BuildHttpClient();
     }
+    public void SetSystemPrompt(string systemPrompt)
+    {
+        var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System);
+        if (systemMessage is null) MessageHistory.Insert(0, MessageContent.Create(Role.System, systemPrompt));
+        else systemMessage.Content = systemPrompt;
+    }
+
     void BuildHttpClient()
     {
         HttpClient?.Dispose();
@@ -35,48 +42,163 @@ public class NativeChatClient : INativeApiClient
     }
     public void ClearHistory()
     {
-        MessageHistory.Clear();
+        var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System);
+        if (systemMessage is not null) MessageHistory = [systemMessage];
+        else MessageHistory.Clear();
     }
 
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent[] messageHistory, List<Chunk> chunks = null, string model = null)
+
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
     {
-        model ??= Model;
+        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), chunks, model, completionsUrl))
+        {
+            yield return chunk;
+        }
+    }
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
+    {
+        MessageHistory.Add(content);
+        await foreach (var chunk in CompletionsStreamAsync([.. MessageHistory], chunks, model, completionsUrl))
+        {
+            yield return chunk;
+        }
+    }
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent[] messageHistory, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
+    {
         chunks ??= [];
-
-        var request = new Request(model, messageHistory);
-        request.SetEnableThinking(false);
-        request.EnableSearch = false;
-
-        await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + "/chat/completions", request))
+        while (true)
         {
-            if (chunk.State) chunks.Add(chunk.Data);
-            yield return chunk;
+            var request = new Request(model ?? Model, [.. MessageHistory]);
+            request.SetEnableThinking(EnableThinking);
+            request.EnableSearch = EnableSearch;
+            request.Tools = makeTools();
+
+
+            Channel<StateSet<bool, Chunk>> channel = Channel.CreateUnbounded<StateSet<bool, Chunk>>();
+
+            var callbackTask = HttpClient.CompletionsStreamAsync(ApiUrl + completionsUrl, request, async (chunkState) =>
+            {
+                try
+                {
+                    await channel.Writer.WriteAsync(chunkState);
+                    if (chunkState.State && chunkState.Data is not null)
+                    {
+                        chunks.Add(chunkState.Data);
+                        if (!chunkState.Data.Choices.IsNullOrEmpty() && !chunkState.Data.Choices.FirstOrDefault().FinishReason.IsNullOrEmpty()) channel.Writer.TryComplete();
+                    }
+                    else channel.Writer.TryComplete();
+                }
+                catch (Exception ex) { channel.Writer.TryComplete(ex); }
+            });
+
+            await foreach (var chunk in channel.Reader.ReadAllAsync())
+            {
+                yield return chunk;
+            }
+
+            var chunkStates = await callbackTask;
+            if (chunkStates.State)
+            {
+                var result = Result.Create([.. chunkStates.Data]);
+                if (result.FinishReason == "stop")
+                {
+                    MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
+                    break;
+                }
+                else if (result.FinishReason == "tool_calls")
+                {
+                    MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
+                    if (!result.ToolCalls.IsNullOrEmpty())
+                    {
+                        string functionName = result.ToolCalls[0].Function.Name;
+                        JObject parameters = result.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ? [] : JsonConvert.DeserializeObject<JObject>(result.ToolCalls[0].Function.Arguments);
+                        var toolCallResult = await ToolCall(functionName, parameters, result.ToolCalls[0].Id);
+                        if (toolCallResult.State) MessageHistory.Add(toolCallResult.Data);
+                        else MessageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), result.ToolCalls[0].Id));
+                        continue;
+                    }
+                    else break;
+                }
+                else break;
+            }
+            else break;
         }
-
-        var result = Result.Create([.. chunks]);
-
-        if (result.FinishReason == "stop") yield break;
     }
 
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, bool withHistory = true, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(string content, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), model, completionsUrl);
+    public async Task<Response> CompletionsAsync(MessageContent content, string model = null, string completionsUrl = "/chat/completions")
     {
-        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), withHistory, chunks, model, completionsUrl))
-        {
-            yield return chunk;
-        }
+        MessageHistory.Add(content);
+        return await CompletionsAsync([.. MessageHistory], model, completionsUrl);
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, bool withHistory = true, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(MessageContent[] messageHistory, string model = null, string completionsUrl = "/chat/completions")
     {
         model ??= Model;
-        send:
-        Request request;
-        if (withHistory) request = new Request(model, [.. MessageHistory, content]);
-        else request = new Request(model, [content]);
+        while (true)
+        {
+            Request request = new Request(model, [.. MessageHistory]);
+            request.SetEnableThinking(EnableThinking);
+            request.EnableSearch = EnableSearch;
+            request.Tools = makeTools();
 
-        request.SetEnableThinking(false);
-        request.EnableSearch = false;
-        request.Tools = [
-            new Tool("function"){
+            var response = await HttpClient.CompletionsAsync(ApiUrl + completionsUrl, request);
+
+            Choice firstChoice = response.Data.Choices.FirstOrDefault();
+            if (firstChoice?.FinishReason == "stop")
+            {
+                MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
+                return response.Data;
+            }
+            else if (firstChoice?.FinishReason == "tool_calls")
+            {
+                MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
+                if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
+                {
+                    string functionName = firstChoice?.Message?.ToolCalls[0].Function.Name;
+                    JObject parameters = firstChoice?.Message?.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ?? false ? [] : JsonConvert.DeserializeObject<JObject>(firstChoice?.Message?.ToolCalls[0].Function.Arguments);
+                    var toolCallResult = await ToolCall(functionName, parameters, firstChoice?.Message?.ToolCalls[0].Id);
+                    if (toolCallResult.State) MessageHistory.Add(toolCallResult.Data);
+                    else MessageHistory.Add(MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id));
+                    continue;
+                }
+                return response.Data;
+            }
+        }
+    }
+
+    public async Task<StateSet<bool, MessageContent>> ToolCall(string functionName, JObject parameters, string toolCallId)
+    {
+        try
+        {
+            switch (functionName)
+            {
+                case "QuoteTool":
+                    if (parameters["symbol"].Value<string>() == "XAUUSD")
+                        return true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
+                    else
+                        return false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
+                case "TradingController":
+                    return false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
+                case "CommandTool":
+                    var commandResult = CommandTool.Execute(parameters["os"].Value<string>(), parameters["command"].Value<string>(), parameters["terminalType"].Value<string>());
+                    return true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
+                case "FileTool":
+                    var fileSystemResult = LocalFileSystemTool.ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"].Value<string>());
+                    return true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
+                default:
+                    return false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
+            }
+        }
+        catch (Exception ex)
+        {
+            return false.ToStateSet<MessageContent>(null, $"执行函数 {functionName} 时发生异常: {ex.Message}");
+        }
+    }
+
+    private List<Tool> makeTools()
+    {
+        return [
+                    new Tool("function"){
                 Function = new ToolFunction("QuoteTool", "A tool to inquery quotes for symbol or product code.")
                 {
                     Parameters = new ToolParameters(){
@@ -112,138 +234,18 @@ public class NativeChatClient : INativeApiClient
                 }
             },
             new Tool("function"){
-                Function = new ToolFunction("LocalFileSystemTool", "It provides some simple ways to manipulate files without using the command line, which is especially useful when writing large amounts of text and content. It also provides some other operations, but note that it only applies to file operations in user control and prohibits operating system files and system corruption.")
+                Function = new ToolFunction("FileTool", "It provides the ability to read and write text files, serving as an alternative when writing and reading large amounts of text using methods similar to command lines or terminals. This tool is not essential; it is simply used to reduce the probability of operations when manipulating large amounts of text files. It returns a JSON object, where Data is the text content.")
                 {
                     Parameters = new ToolParameters(){
                         Properties = new Dictionary<string, ToolParameterProperty>(){
                             { "action", new ToolParameterProperty("string", "The action to perform on the file system.", ["write", "read"]) },
                             { "path", new ToolParameterProperty("string", "The path of the file to operate on.") },
-                            { "content", new ToolParameterProperty("string", "The content to write to the file, if applicable.") },
+                            { "content", new ToolParameterProperty("string", "This parameter is ignored when reading; it can be replaced with null.") },
                         },
                         Required = ["action", "path", "content"],
                     }
                 }
             },
         ];
-
-        if (withHistory) MessageHistory.Add(request.Messages.LastOrDefault());
-        chunks ??= [];
-        List<Chunk> OnceChunks = [];
-
-        await foreach (var chunk in HttpClient.CompletionsStreamAsync(ApiUrl + completionsUrl, request))
-        {
-            if (chunk.State)
-            {
-                chunks.Add(chunk.Data);
-                OnceChunks.Add(chunk.Data);
-            }
-            yield return chunk;
-        }
-
-        var result = Result.Create([.. OnceChunks]);
-
-        if (withHistory)
-        {
-            if (result.FinishReason == "stop")
-                MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
-            else if (result.FinishReason == "tool_calls")
-            {
-                MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
-
-                string functionName = result.ToolCalls[0].Function.Name;
-                JObject parameters = JsonConvert.DeserializeObject<JObject>(result.ToolCalls[0].Function.Arguments);
-                var toolCallResult = await ToolCall(functionName, parameters, result.ToolCalls[0].Id);
-                if (toolCallResult.State) content = toolCallResult.Data;
-                else content = MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), result.ToolCalls[0].Id);
-                goto send;
-            }
-        }
-    }
-
-    public async Task<Response> CompletionsAsync(string content, bool withHistory = true, string model = null)
-    {
-        return await CompletionsAsync(MessageContent.Create(Role.User, content), withHistory, model);
-    }
-    public async Task<Response> CompletionsAsync(MessageContent content, bool withHistory = true, string model = null)
-    {
-        model ??= Model;
-        send:
-        Request request;
-
-        if (withHistory) request = new Request(model, [.. MessageHistory, content]);
-        else request = new Request(model, [content]);
-
-        request.SetEnableThinking(false);
-        request.EnableSearch = false;
-        request.Tools = [
-            new Tool("function"){
-                Function = new ToolFunction("QuoteTool", "A tool to inquery quotes for symbol or product code.")
-                {
-                    Parameters = new ToolParameters(){
-                        Properties = new Dictionary<string, ToolParameterProperty>(){
-                            {
-                                "symbol", new ToolParameterProperty("string", "The symbol or product code to query quotes for.")
-                            },
-                        },
-                        Required = ["symbol"],
-                    }
-                }
-            },
-        ];
-
-        if (withHistory) MessageHistory.Add(request.Messages.LastOrDefault());
-
-        var response = await HttpClient.CompletionsAsync(ApiUrl + "/chat/completions", request);
-
-        if (withHistory)
-        {
-            Choice firstChoice = response.Data.Choices.FirstOrDefault();
-            if (firstChoice?.FinishReason == "stop")
-                MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
-            else if (firstChoice?.FinishReason == "tool_calls")
-            {
-                MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
-
-                string functionName = firstChoice?.Message?.ToolCalls[0].Function.Name;
-                JObject parameters = JsonConvert.DeserializeObject<JObject>(firstChoice?.Message?.ToolCalls[0].Function.Arguments);
-                var toolCallResult = await ToolCall(functionName, parameters, firstChoice?.Message?.ToolCalls[0].Id);
-                if (toolCallResult.State) content = toolCallResult.Data;
-                else content = MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id);
-                goto send;
-            }
-        }
-
-
-        return response.Data;
-    }
-
-
-    public async Task<StateSet<bool, MessageContent>> ToolCall(string functionName, JObject parameters, string toolCallId)
-    {
-        try
-        {
-            switch (functionName)
-            {
-                case "QuoteTool":
-                    if (parameters["symbol"].Value<string>() == "XAUUSD")
-                        return true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
-                    else
-                        return false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
-                case "TradingController":
-                    return false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
-                case "CommandTool":
-                    var commandResult = CommandTool.Execute(parameters["os"].Value<string>(), parameters["command"].Value<string>(), parameters["terminalType"].Value<string>());
-                    return true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
-                case "LocalFileSystemTool":
-                    var fileSystemResult = LocalFileSystemTool.ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"].Value<string>());
-                    return true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
-                default:
-                    return false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
-            }
-        }
-        catch (Exception ex)
-        {
-            return false.ToStateSet<MessageContent>(null, $"执行函数 {functionName} 时发生异常: {ex.Message}");
-        }
     }
 }

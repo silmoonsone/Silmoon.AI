@@ -49,97 +49,54 @@ public class SseHttpClient : HttpClient
             return false.ToStateSet<Response>(null, $"Exception during HTTP request: {ex.Message}");
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string url, Request request)
+
+    public async Task<StateSet<bool, Chunk[]>> CompletionsStreamAsync(string url, Request request, Func<StateSet<bool, Chunk>, Task> callback)
     {
-        request.Stream = true;
-        var jsonString = request.ToJsonString(serializerSettings);
-
-        //Console.WriteLine($"Request JSON: {jsonString}");
-
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-        httpRequest.Content = new StringContent(jsonString, Encoding.UTF8, "application/json");
-        HttpResponseMessage response = null;
-        Exception exception = null;
-        try { response = await SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead); }
-        catch (Exception ex) { exception = ex; }
-        if (exception is not null)
+        try
         {
-            yield return false.ToStateSet<Chunk>(null, $"Exception during HTTP request: {exception.Message}");
-            yield break;
-        }
-        using (response)
-        {
+            request.Stream = true;
+            var jsonString = request.ToJsonString(serializerSettings);
+
+            //Console.WriteLine($"Request JSON: {jsonString}");
+
+            using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
+            httpRequest.Content = new StringContent(jsonString, Encoding.UTF8, "application/json");
+            using HttpResponseMessage response = await SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead);
+
+            // HttpClient 请求已发起。
+
             if (response.StatusCode == HttpStatusCode.OK)
             {
                 using var stream = await response.Content.ReadAsStreamAsync();
                 using var reader = new StreamReader(stream);
+                List<Chunk> chunks = [];
                 string? line;
                 while ((line = await reader.ReadLineAsync()) is not null)
                 {
                     //Console.WriteLine($"{line}");
                     if (line.StartsWith("data:"))
                     {
-                        Chunk chunkData = null;
                         try
                         {
                             var json = line[5..].Trim();
-                            if (json == "[DONE]") break;
-                            chunkData = JsonConvert.DeserializeObject<Chunk>(json, serializerSettings);
-                        }
-                        catch (Exception ex) { exception = ex; }
-
-                        if (exception is not null)
-                        {
-                            yield return false.ToStateSet<Chunk>(null, $"Exception during JSON deserialization: {exception.Message}, Line: {line}");
-                            yield break;
-                        }
-                        else yield return true.ToStateSet(chunkData, line);
-                    }
-                }
-            }
-            else
-            {
-                var errorContent = await response.Content.ReadAsStringAsync();
-                //Console.WriteLine($"Error response: {errorContent}");
-                yield return false.ToStateSet<Chunk>(null, $"HTTP error: {response.StatusCode}, Content: {errorContent}");
-            }
-        }
-    }
-    public async Task<StateSet<bool, Chunk[]>> CompletionsStreamCallbackAsync(string url, Request request, Action<StateSet<bool, Chunk>> callback)
-    {
-        request.Stream = true;
-        var jsonString = request.ToJsonString(serializerSettings);
-
-        List<Chunk> chunks = [];
-        //Console.WriteLine($"Request JSON: {jsonString}");
-
-        using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-        httpRequest.Content = new StringContent(jsonString, Encoding.UTF8, "application/json");
-        HttpResponseMessage response = null;
-        try { response = await SendAsync(httpRequest, HttpCompletionOption.ResponseHeadersRead); }
-        catch (Exception ex) { return false.ToStateSet<Chunk[]>(null, $"Exception during HTTP request: {ex.Message}"); }
-        using (response)
-        {
-            if (response.StatusCode == HttpStatusCode.OK)
-            {
-                using var stream = await response.Content.ReadAsStreamAsync();
-                using var reader = new StreamReader(stream);
-                string? line;
-                while ((line = await reader.ReadLineAsync()) is not null)
-                {
-                    //Console.WriteLine($"{line}");
-                    if (line.StartsWith("data:"))
-                    {
-                        Chunk chunkData = null;
-                        try
-                        {
-                            var json = line[5..].Trim();
-                            if (json == "[DONE]") break;
-                            chunkData = JsonConvert.DeserializeObject<Chunk>(json, serializerSettings);
-                            callback(true.ToStateSet(chunkData));
+                            if (json == "[DONE]")
+                            {
+                                await callback(true.ToStateSet<Chunk>(null));
+                                break;
+                            }
+                            else
+                            {
+                                var chunkData = JsonConvert.DeserializeObject<Chunk>(json, serializerSettings);
+                                if (chunkData != null)
+                                {
+                                    chunks.Add(chunkData);
+                                    await callback(true.ToStateSet(chunkData));
+                                }
+                            }
                         }
                         catch (Exception ex)
                         {
+                            await callback(false.ToStateSet<Chunk>(null, ex.Message));
                             return false.ToStateSet<Chunk[]>(null, $"Exception during JSON deserialization: {ex.Message}, Line: {line}");
                         }
                     }
@@ -149,9 +106,14 @@ public class SseHttpClient : HttpClient
             else
             {
                 var errorContent = await response.Content.ReadAsStringAsync();
-                //Console.WriteLine($"Error response: {errorContent}");
-                return false.ToStateSet<Chunk[]>(null, $"HTTP error: {response.StatusCode}, Content: {errorContent}");
+                await callback(false.ToStateSet<Chunk>(null, $"Http status code: {response.StatusCode}, Content: {errorContent}"));
+                return false.ToStateSet<Chunk[]>(null, $"Http status code: {response.StatusCode}, Content: {errorContent}");
             }
+        }
+        catch (Exception ex)
+        {
+            await callback(false.ToStateSet<Chunk>(null, ex.Message));
+            return false.ToStateSet<Chunk[]>(null, ex.Message);
         }
     }
 }
