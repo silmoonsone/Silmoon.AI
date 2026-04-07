@@ -28,7 +28,7 @@ namespace Silmoon.AI.Client.ToolCall
         }
         public static string ExecuteCmd(string command)
         {
-            Console.WriteLineWithColor($"\r\n[CMD] {command}", ConsoleColor.Green);
+            Console.WriteLineWithColor($"[CMD] {command}", ConsoleColor.Green);
             var processInfo = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c {command}")
             {
                 RedirectStandardOutput = true,
@@ -44,7 +44,7 @@ namespace Silmoon.AI.Client.ToolCall
         }
         public static string ExecutePowerShell(string command)
         {
-            Console.WriteLineWithColor($"\r\n[PowerShell] {command}", ConsoleColor.Green);
+            Console.WriteLineWithColor($"[PowerShell] {command}", ConsoleColor.Green);
             var processInfo = new System.Diagnostics.ProcessStartInfo("powershell.exe", $"-Command {command}")
             {
                 RedirectStandardOutput = true,
@@ -60,7 +60,7 @@ namespace Silmoon.AI.Client.ToolCall
         }
         public static string MacOSExecute(string command)
         {
-            Console.WriteLineWithColor($"\r\n[macOS] {command}", ConsoleColor.Green);
+            Console.WriteLineWithColor($"[macOS] {command}", ConsoleColor.Green);
             var processInfo = new System.Diagnostics.ProcessStartInfo("/bin/bash", $"-c \"{command}\"")
             {
                 RedirectStandardOutput = true,
@@ -76,7 +76,7 @@ namespace Silmoon.AI.Client.ToolCall
         }
         public static string LinuxExecute(string command)
         {
-            Console.WriteLineWithColor($"\r\n[Linux] {command}", ConsoleColor.Green);
+            Console.WriteLineWithColor($"[Linux] {command}", ConsoleColor.Green);
             var processInfo = new System.Diagnostics.ProcessStartInfo("/bin/bash", $"-c \"{command}\"")
             {
                 RedirectStandardOutput = true,

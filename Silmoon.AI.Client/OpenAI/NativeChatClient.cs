@@ -12,6 +12,7 @@ namespace Silmoon.AI.Client.OpenAI;
 
 public class NativeChatClient : INativeApiClient
 {
+    public event ToolCallInvokeHandler OnToolCallInvoke;
     public string ApiUrl { get; set; }
     public string ApiKey { get; set; }
     public string Model { get; set; }
@@ -19,16 +20,20 @@ public class NativeChatClient : INativeApiClient
     public bool EnableThinking { get; set; } = false;
     public bool EnableSearch { get; set; } = false;
     public List<MessageContent> MessageHistory { get; set; } = [];
+
+
     public NativeChatClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
     {
         ApiUrl = apiUrl;
         ApiKey = apiKey;
         Model = model;
-        if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, systemPrompt));
+        SetSystemPrompt(systemPrompt);
+
         BuildHttpClient();
     }
     public void SetSystemPrompt(string systemPrompt)
     {
+        if (systemPrompt is null) return;
         var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System);
         if (systemMessage is null) MessageHistory.Insert(0, MessageContent.Create(Role.System, systemPrompt));
         else systemMessage.Content = systemPrompt;
@@ -58,17 +63,17 @@ public class NativeChatClient : INativeApiClient
     public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
-        await foreach (var chunk in CompletionsStreamAsync([.. MessageHistory], chunks, model, completionsUrl))
+        await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, model, completionsUrl))
         {
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent[] messageHistory, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
     {
         chunks ??= [];
         while (true)
         {
-            var request = new Request(model ?? Model, [.. MessageHistory]);
+            var request = new Request(model ?? Model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking);
             request.EnableSearch = EnableSearch;
             request.Tools = makeTools();
@@ -102,19 +107,19 @@ public class NativeChatClient : INativeApiClient
                 var result = Result.Create([.. chunkStates.Data]);
                 if (result.FinishReason == "stop")
                 {
-                    MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
+                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
                     break;
                 }
                 else if (result.FinishReason == "tool_calls")
                 {
-                    MessageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
+                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
                     if (!result.ToolCalls.IsNullOrEmpty())
                     {
                         string functionName = result.ToolCalls[0].Function.Name;
                         JObject parameters = result.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ? [] : JsonConvert.DeserializeObject<JObject>(result.ToolCalls[0].Function.Arguments);
                         var toolCallResult = await ToolCall(functionName, parameters, result.ToolCalls[0].Id);
-                        if (toolCallResult.State) MessageHistory.Add(toolCallResult.Data);
-                        else MessageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), result.ToolCalls[0].Id));
+                        if (toolCallResult.State) messageHistory.Add(toolCallResult.Data);
+                        else messageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), result.ToolCalls[0].Id));
                         continue;
                     }
                     else break;
@@ -129,14 +134,14 @@ public class NativeChatClient : INativeApiClient
     public async Task<Response> CompletionsAsync(MessageContent content, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
-        return await CompletionsAsync([.. MessageHistory], model, completionsUrl);
+        return await CompletionsAsync(MessageHistory, model, completionsUrl);
     }
-    public async Task<Response> CompletionsAsync(MessageContent[] messageHistory, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(List<MessageContent> messageHistory, string model = null, string completionsUrl = "/chat/completions")
     {
         model ??= Model;
         while (true)
         {
-            Request request = new Request(model, [.. MessageHistory]);
+            Request request = new Request(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking);
             request.EnableSearch = EnableSearch;
             request.Tools = makeTools();
@@ -146,19 +151,19 @@ public class NativeChatClient : INativeApiClient
             Choice firstChoice = response.Data.Choices.FirstOrDefault();
             if (firstChoice?.FinishReason == "stop")
             {
-                MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
+                messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
                 return response.Data;
             }
             else if (firstChoice?.FinishReason == "tool_calls")
             {
-                MessageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
+                messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
                 if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
                 {
                     string functionName = firstChoice?.Message?.ToolCalls[0].Function.Name;
                     JObject parameters = firstChoice?.Message?.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ?? false ? [] : JsonConvert.DeserializeObject<JObject>(firstChoice?.Message?.ToolCalls[0].Function.Arguments);
                     var toolCallResult = await ToolCall(functionName, parameters, firstChoice?.Message?.ToolCalls[0].Id);
-                    if (toolCallResult.State) MessageHistory.Add(toolCallResult.Data);
-                    else MessageHistory.Add(MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id));
+                    if (toolCallResult.State) messageHistory.Add(toolCallResult.Data);
+                    else messageHistory.Add(MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id));
                     continue;
                 }
                 return response.Data;
@@ -170,24 +175,34 @@ public class NativeChatClient : INativeApiClient
     {
         try
         {
+            Console.WriteLine();
+            Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
+            var result = await (OnToolCallInvoke?.Invoke(functionName, parameters, toolCallId) ?? Task.FromResult<StateSet<bool, MessageContent>>(null));
+            if (result is not null && result.State) return result;
+
             switch (functionName)
             {
                 case "QuoteTool":
-                    if (parameters["symbol"].Value<string>() == "XAUUSD")
-                        return true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
-                    else
-                        return false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
+                    if (parameters["symbol"].Value<string>() == "XAUUSD") return true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
+                    else result = false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，我们接受的应该是国际通用的产品符号，并且没有斜杠分割（/），如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
+                    break;
                 case "TradingController":
-                    return false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
+                    result = false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
+                    break;
                 case "CommandTool":
                     var commandResult = CommandTool.Execute(parameters["os"].Value<string>(), parameters["command"].Value<string>(), parameters["terminalType"].Value<string>());
-                    return true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
+                    result = true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
+                    break;
                 case "FileTool":
                     var fileSystemResult = LocalFileSystemTool.ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"].Value<string>());
-                    return true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
+                    result = true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
+                    break;
                 default:
-                    return false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
+                    result = false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
+                    break;
             }
+            Console.WriteLineWithColor($"[TOOL CALL RESULT] State: {result.State}, Message: {result.Data?.Content}", ConsoleColor.Yellow);
+            return result;
         }
         catch (Exception ex)
         {
@@ -221,7 +236,7 @@ public class NativeChatClient : INativeApiClient
                 }
             },
             new Tool("function"){
-                Function = new ToolFunction("CommandTool", "It can execute commands on the local computer and supports Windows, macOS, and Linux. Note that you should not use this tool to execute dangerous commands, including power control, modifying and deleting important files and system files. Some high-risk operations require prompting the user for confirmation before execution.")
+                Function = new ToolFunction("CommandTool", "It can execute commands on the local computer and supports Windows, macOS, and Linux systems. Please note that you should not use this tool to execute dangerous commands, including power control, modifying or deleting important files and system files. Some high-risk operations require user confirmation before execution. Also note that CommandTool does not save context with each call; each command is independent. For example, calling `cd ...` will render the previous `cd` command's directory-changing behavior meaningless if called a second time.")
                 {
                     Parameters = new ToolParameters(){
                         Properties = new Dictionary<string, ToolParameterProperty>(){
@@ -249,3 +264,5 @@ public class NativeChatClient : INativeApiClient
         ];
     }
 }
+
+public delegate Task<StateSet<bool, MessageContent>> ToolCallInvokeHandler(string functionName, JObject parameters, string toolCallId);

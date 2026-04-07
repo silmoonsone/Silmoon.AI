@@ -15,7 +15,7 @@ namespace Silmoon.AI.WinFormTest
 {
     public partial class OpenAIClientTestForm : Form
     {
-        NativeChatClient NativeApiClient { get; set; }
+        NativeChatClient NativeChatClient { get; set; }
         SilmoonConfigureService ConfigureService { get; set; }
 
         public OpenAIClientTestForm()
@@ -28,18 +28,32 @@ namespace Silmoon.AI.WinFormTest
             option.ReleaseConfig();
 #endif
             ConfigureService = SilmoonConfigureService.CreateSingleton(option);
+
+            var systemPrompt = textBox1.Text;
+            systemPrompt = MakeSystemPrompt();
+            NativeChatClient = new NativeChatClient(ConfigureService.ConfigJson.Value<string>("aiApiUrl"), ConfigureService.ConfigJson.Value<string>("aiKey"), ConfigureService.ConfigJson.Value<string>("aiModelName"), systemPrompt);
+        }
+        public string MakeSystemPrompt()
+        {
+            return $"""
+            你是一个人工智能助手，协助用户完成各种任务，以下是一些关于当前环境的信息：
+            操作系统: {Environment.OSVersion.VersionString}
+            当前目录: {Environment.CurrentDirectory}
+            当前时间: {DateTime.Now}
+            当前用户: {Environment.UserName}
+            当前用户主目录: {Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}
+            """;
         }
 
         private async void button1_Click(object sender, EventArgs e)
         {
-            var systemPrompt = textBox1.Text;
             var userPrompt = textBox3.Text;
             textBox2.Text = string.Empty;
             textBox3.Text = string.Empty;
-            NativeApiClient = new NativeChatClient(ConfigureService.ConfigJson.Value<string>("aiApiUrl"), ConfigureService.ConfigJson.Value<string>("aiKey"), ConfigureService.ConfigJson.Value<string>("aiModelName"), systemPrompt);
+
 
             List<Chunk> chunks = [];
-            await foreach (var chunk in NativeApiClient.CompletionsStreamAsync(userPrompt, chunks))
+            await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(userPrompt, chunks))
             {
                 if (chunk.State)
                 {
@@ -56,8 +70,9 @@ namespace Silmoon.AI.WinFormTest
                 }
                 else Console.WriteLineWithColor(chunk.Message, ConsoleColor.Red);
             }
+            Console.WriteLine();
             var result = Result.Create([.. chunks]);
-            Console.WriteLine($"\nFinishReason={result.FinishReason}");
+            Console.WriteLine($"FinishReason={result.FinishReason}");
             if (result.FinishReason == "tool_calls") Console.WriteWithColor(result.ToolCalls.ToFormattedJsonString(), ConsoleColor.DarkYellow);
         }
     }

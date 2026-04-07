@@ -3,6 +3,7 @@ using Microsoft.Extensions.Hosting;
 using Silmoon.AI.Client.OpenAI;
 using Silmoon.AI.Client.OpenAI.Enums;
 using Silmoon.AI.Client.OpenAI.Models;
+using Silmoon.AI.Client.Prompts;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 
@@ -19,7 +20,7 @@ public class ClientService : IHostedService
         ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
         // Client = new Client("https://dashscope.aliyuncs.com/compatible-mode/v1", SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
-        NativeChatClient = new NativeChatClient(SilmoonConfigureService.AIApiUrl, SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName, MakeSystemPrompt());
+        NativeChatClient = new NativeChatClient(SilmoonConfigureService.AIApiUrl, SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName, UtilPrompt.LocalMachineAgentPrompt);
     }
     public Task StartAsync(CancellationToken cancellationToken)
     {
@@ -28,17 +29,6 @@ public class ClientService : IHostedService
     public Task StopAsync(CancellationToken cancellationToken)
     {
         return Task.CompletedTask;
-    }
-    public string MakeSystemPrompt()
-    {
-        return $"""
-            你是一个人工智能助手，协助用户完成各种任务，以下是一些关于当前环境的信息：
-            操作系统: {Environment.OSVersion.VersionString}
-            当前目录: {Environment.CurrentDirectory}
-            当前时间: {DateTime.Now}
-            当前用户: {Environment.UserName}
-            当前用户主目录: {Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}
-            """;
     }
 
     public async Task Start(bool stream = true)
