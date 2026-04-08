@@ -6,6 +6,7 @@ using Silmoon.AI.Client.OpenAI.Models;
 using Silmoon.AI.Client.Prompts;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
+using Silmoon.Models;
 
 namespace Silmoon.AI.HostingTest.Services;
 
@@ -21,7 +22,25 @@ public class ClientService : IHostedService
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
         // Client = new Client("https://dashscope.aliyuncs.com/compatible-mode/v1", SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName);
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.AIApiUrl, SilmoonConfigureService.AIKey, SilmoonConfigureService.AIModelName, UtilPrompt.LocalMachineAgentPrompt);
+        NativeChatClient.OnToolCallInvoke += NativeChatClient_OnToolCallInvoke;
+        NativeChatClient.OnToolCallFinished += NativeChatClient_OnToolCallFinished1; ;
+        //NativeChatClient.EnableThinking = true;
     }
+
+    private Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallFinished1(StateSet<bool, MessageContent> arg)
+    {
+        if (arg.State) Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Cyan);
+        else Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Red);
+        return Task.FromResult(arg);
+    }
+
+    private Task<Models.StateSet<bool, MessageContent>> NativeChatClient_OnToolCallInvoke(string functionName, Newtonsoft.Json.Linq.JObject parameters, string toolCallId)
+    {
+        Console.WriteLine();
+        Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
+        return null;
+    }
+
     public Task StartAsync(CancellationToken cancellationToken)
     {
         return Task.CompletedTask;

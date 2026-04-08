@@ -13,6 +13,7 @@ namespace Silmoon.AI.Client.OpenAI;
 public class NativeChatClient : INativeApiClient
 {
     public event ToolCallInvokeHandler OnToolCallInvoke;
+    public event Func<StateSet<bool, MessageContent>, Task<StateSet<bool, MessageContent>>> OnToolCallFinished;
     public string ApiUrl { get; set; }
     public string ApiKey { get; set; }
     public string Model { get; set; }
@@ -80,20 +81,24 @@ public class NativeChatClient : INativeApiClient
 
 
             Channel<StateSet<bool, Chunk>> channel = Channel.CreateUnbounded<StateSet<bool, Chunk>>();
-
+            bool channelClosed = false;
             var callbackTask = HttpClient.CompletionsStreamAsync(ApiUrl + completionsUrl, request, async (chunkState) =>
             {
                 try
                 {
-                    await channel.Writer.WriteAsync(chunkState);
+                    if (!channelClosed) await channel.Writer.WriteAsync(chunkState);
                     if (chunkState.State && chunkState.Data is not null)
                     {
                         chunks.Add(chunkState.Data);
-                        if (!chunkState.Data.Choices.IsNullOrEmpty() && !chunkState.Data.Choices.FirstOrDefault().FinishReason.IsNullOrEmpty()) channel.Writer.TryComplete();
+                        if (!chunkState.Data.Choices.IsNullOrEmpty() && !chunkState.Data.Choices.FirstOrDefault().FinishReason.IsNullOrEmpty())
+                            channelClosed = channel.Writer.TryComplete();
                     }
-                    else channel.Writer.TryComplete();
+                    else channelClosed = channel.Writer.TryComplete();
                 }
-                catch (Exception ex) { channel.Writer.TryComplete(ex); }
+                catch (Exception ex)
+                {
+                    channelClosed = channel.Writer.TryComplete(ex);
+                }
             });
 
             await foreach (var chunk in channel.Reader.ReadAllAsync())
@@ -175,8 +180,6 @@ public class NativeChatClient : INativeApiClient
     {
         try
         {
-            Console.WriteLine();
-            Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
             var result = await (OnToolCallInvoke?.Invoke(functionName, parameters, toolCallId) ?? Task.FromResult<StateSet<bool, MessageContent>>(null));
             if (result is not null && result.State) return result;
 
@@ -201,7 +204,8 @@ public class NativeChatClient : INativeApiClient
                     result = false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
                     break;
             }
-            Console.WriteLineWithColor($"[TOOL CALL RESULT] State: {result.State}, Message: {result.Data?.Content}", ConsoleColor.Yellow);
+            result = await (OnToolCallFinished?.Invoke(result) ?? Task.FromResult(result));
+
             return result;
         }
         catch (Exception ex)
@@ -236,7 +240,7 @@ public class NativeChatClient : INativeApiClient
                 }
             },
             new Tool("function"){
-                Function = new ToolFunction("CommandTool", "It can execute commands on the local computer and supports Windows, macOS, and Linux systems. Please note that you should not use this tool to execute dangerous commands, including power control, modifying or deleting important files and system files. Some high-risk operations require user confirmation before execution. Also note that CommandTool does not save context with each call; each command is independent. For example, calling `cd ...` will render the previous `cd` command's directory-changing behavior meaningless if called a second time.")
+                Function = new ToolFunction("CommandTool", "It can execute commands on the local computer and supports Windows, macOS, and Linux systems. Please note that you should not use this tool to execute dangerous commands, including power control, modifying or deleting important files and system files. Some high-risk operations require user confirmation before execution. Also, note that CommandTool does not save context with each call; each command is independent. For example, calling `cd ...` a second time renders the previous `cd` command's directory-changing behavior meaningless. Therefore, the `cd` command cannot be used alone. Consider using the \"&&\" in CMD and the \";;\" in PowerShell to pipe the `cd` command in conjunction with other commands. However, note that when using the `cd` command directly in CMD to change directories, switching between drives is ineffective; you must first change the drive letter and then use `cd` to change directories. If multiple commands are to be executed together, it is recommended to use PowerShell throughout!")
                 {
                     Parameters = new ToolParameters(){
                         Properties = new Dictionary<string, ToolParameterProperty>(){
