@@ -13,6 +13,30 @@ public class Tool
     {
         Type = type;
     }
+    public static Tool Create(string functionName, string functionDescription, ToolParameterProperty[] toolParameterProperties)
+    {
+        var result = new Tool("function")
+        {
+            Function = new ToolFunction(functionName, functionDescription)
+            {
+                Parameters = new ToolParameters()
+                {
+                    Type = "object",
+                    Properties = new Dictionary<string, ToolParameterProperty>(),
+                    Required = new List<string>(),
+                    AdditionalProperties = false
+                }
+            }
+        };
+
+        foreach (var item in toolParameterProperties)
+        {
+            result.Function.Parameters.Properties.Add(item.Name, item);
+            if (result.Function.Parameters.Required != null && item.IsRequired) result.Function.Parameters.Required.Add(item.Name);
+        }
+
+        return result;
+    }
 }
 
 public class ToolFunction
@@ -53,10 +77,19 @@ public class ToolParameterProperty
     [JsonProperty("items")]
     public ToolParameters? Items { get; set; }
 
-    public ToolParameterProperty(string type, string description, List<object> @enum = null)
+
+    [JsonIgnore]
+    public string Name { get; set; }
+    [JsonIgnore]
+    public bool IsRequired { get; set; }
+
+    public ToolParameterProperty(string type, string description, List<object> @enum = null, string name = null, bool isRequired = false)
     {
         Type = type;
         Description = description;
         Enum = @enum;
+
+        Name = name;
+        IsRequired = isRequired;
     }
 }

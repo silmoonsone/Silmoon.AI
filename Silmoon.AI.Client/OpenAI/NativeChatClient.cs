@@ -54,22 +54,22 @@ public class NativeChatClient : INativeApiClient
     }
 
 
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, List<Chunk> chunks = null, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
-        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), chunks, model, completionsUrl))
+        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
         {
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, List<Chunk> chunks = null, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
-        await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, model, completionsUrl))
+        await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
         {
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         chunks ??= [];
         while (true)
@@ -77,7 +77,7 @@ public class NativeChatClient : INativeApiClient
             var request = new Request(model ?? Model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking);
             request.EnableSearch = EnableSearch;
-            request.Tools = makeTools();
+            request.Tools = tools;
 
 
             Channel<StateSet<bool, Chunk>> channel = Channel.CreateUnbounded<StateSet<bool, Chunk>>();
@@ -135,13 +135,13 @@ public class NativeChatClient : INativeApiClient
         }
     }
 
-    public async Task<Response> CompletionsAsync(string content, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), model, completionsUrl);
-    public async Task<Response> CompletionsAsync(MessageContent content, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(string content, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
+    public async Task<Response> CompletionsAsync(MessageContent content, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
-        return await CompletionsAsync(MessageHistory, model, completionsUrl);
+        return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<Response> CompletionsAsync(List<MessageContent> messageHistory, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(List<MessageContent> messageHistory, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         model ??= Model;
         while (true)
@@ -149,7 +149,7 @@ public class NativeChatClient : INativeApiClient
             Request request = new Request(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking);
             request.EnableSearch = EnableSearch;
-            request.Tools = makeTools();
+            request.Tools = tools;
 
             var response = await HttpClient.CompletionsAsync(ApiUrl + completionsUrl, request);
 
@@ -181,32 +181,8 @@ public class NativeChatClient : INativeApiClient
         try
         {
             var result = await (OnToolCallInvoke?.Invoke(functionName, parameters, toolCallId) ?? Task.FromResult<StateSet<bool, MessageContent>>(null));
-            if (result is not null && result.State) return result;
-
-            switch (functionName)
-            {
-                case "QuoteTool":
-                    if (parameters["symbol"].Value<string>() == "XAUUSD") return true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
-                    else result = false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，我们接受的应该是国际通用的产品符号，并且没有斜杠分割（/），如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
-                    break;
-                case "TradingController":
-                    result = false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
-                    break;
-                case "CommandTool":
-                    var commandResult = CommandTool.Execute(parameters["os"].Value<string>(), parameters["command"].Value<string>(), parameters["terminalType"].Value<string>());
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
-                    break;
-                case "FileTool":
-                    var fileSystemResult = LocalFileSystemTool.ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"].Value<string>());
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
-                    break;
-                default:
-                    result = false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
-                    break;
-            }
             result = await (OnToolCallFinished?.Invoke(result) ?? Task.FromResult(result));
-
-            return result;
+            return result ?? false.ToStateSet<MessageContent>(null, $"function {functionName} not implemented.");
         }
         catch (Exception ex)
         {
@@ -214,59 +190,6 @@ public class NativeChatClient : INativeApiClient
         }
     }
 
-    private List<Tool> makeTools()
-    {
-        return [
-                    new Tool("function"){
-                Function = new ToolFunction("QuoteTool", "A tool to inquery quotes for symbol or product code.")
-                {
-                    Parameters = new ToolParameters(){
-                        Properties = new Dictionary<string, ToolParameterProperty>(){
-                            { "symbol", new ToolParameterProperty("string", "The symbol or product code to query quotes for.") },
-                        },
-                        Required = ["symbol"],
-                    }
-                }
-            },
-            new Tool("function"){
-                Function = new ToolFunction("TradingController", "A tool to control trading client.")
-                {
-                    Parameters = new ToolParameters(){
-                        Properties = new Dictionary<string, ToolParameterProperty>(){
-                            { "action", new ToolParameterProperty("string", "The action to perform on the trading client.",["start", "stop", "pause", "resume"]) },
-                        },
-                        Required = ["action"],
-                    }
-                }
-            },
-            new Tool("function"){
-                Function = new ToolFunction("CommandTool", "It can execute commands on the local computer and supports Windows, macOS, and Linux systems. Please note that you should not use this tool to execute dangerous commands, including power control, modifying or deleting important files and system files. Some high-risk operations require user confirmation before execution. Also, note that CommandTool does not save context with each call; each command is independent. For example, calling `cd ...` a second time renders the previous `cd` command's directory-changing behavior meaningless. Therefore, the `cd` command cannot be used alone. Consider using the \"&&\" in CMD and the \";;\" in PowerShell to pipe the `cd` command in conjunction with other commands. However, note that when using the `cd` command directly in CMD to change directories, switching between drives is ineffective; you must first change the drive letter and then use `cd` to change directories. If multiple commands are to be executed together, it is recommended to use PowerShell throughout!")
-                {
-                    Parameters = new ToolParameters(){
-                        Properties = new Dictionary<string, ToolParameterProperty>(){
-                            { "os", new ToolParameterProperty("string", "The operating system on which to execute the command.", ["windows", "macos", "linux"]) },
-                            { "command", new ToolParameterProperty("string", "The command to execute in cmd or powershell.") },
-                            { "terminalType", new ToolParameterProperty("string", "Which command line should be used in Windows? What parameters are required in Windows? It supports cmd and PowerShell parameters; on other platforms, empty or null parameters are acceptable.", ["cmd", "powershell", null]) },
-                        },
-                        Required = ["os", "command", "terminalType"],
-                    }
-                }
-            },
-            new Tool("function"){
-                Function = new ToolFunction("FileTool", "It provides the ability to read and write text files, serving as an alternative when writing and reading large amounts of text using methods similar to command lines or terminals. This tool is not essential; it is simply used to reduce the probability of operations when manipulating large amounts of text files. It returns a JSON object, where Data is the text content.")
-                {
-                    Parameters = new ToolParameters(){
-                        Properties = new Dictionary<string, ToolParameterProperty>(){
-                            { "action", new ToolParameterProperty("string", "The action to perform on the file system.", ["write", "read"]) },
-                            { "path", new ToolParameterProperty("string", "The path of the file to operate on.") },
-                            { "content", new ToolParameterProperty("string", "This parameter is ignored when reading; it can be replaced with null.") },
-                        },
-                        Required = ["action", "path", "content"],
-                    }
-                }
-            },
-        ];
-    }
 }
 
 public delegate Task<StateSet<bool, MessageContent>> ToolCallInvokeHandler(string functionName, JObject parameters, string toolCallId);
