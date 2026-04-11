@@ -27,7 +27,7 @@ namespace Silmoon.AI.HostingTest.Services
         {
             Logger = logger;
             SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
-            AIClient = new OpenAIClient(new ApiKeyCredential(SilmoonConfigureService.AIKey), new OpenAIClientOptions() { Endpoint = new Uri("https://dashscope.aliyuncs.com/compatible-mode/v1"), });
+            AIClient = new OpenAIClient(new ApiKeyCredential(SilmoonConfigureService.Key), new OpenAIClientOptions() { Endpoint = new Uri("https://dashscope.aliyuncs.com/compatible-mode/v1"), });
             //AIClient = new OpenAIClient(new ApiKeyCredential(SilmoonConfigureService.AIKey), new OpenAIClientOptions() { Endpoint = new Uri("http://localhost:11434/v1"), });
         }
 
@@ -126,9 +126,9 @@ namespace Silmoon.AI.HostingTest.Services
 
         public async Task StartAI()
         {
-            Logger.LogInformation($"正在准备AI客户端，模型{SilmoonConfigureService.AIModelName}...");
+            Logger.LogInformation($"正在准备AI客户端，模型{SilmoonConfigureService.ModelName}...");
             //var models = await AIClient.GetOpenAIModelClient().GetModelsAsync();
-            var model = await AIClient.GetOpenAIModelClient().GetModelAsync(SilmoonConfigureService.AIModelName);
+            var model = await AIClient.GetOpenAIModelClient().GetModelAsync(SilmoonConfigureService.ModelName);
             var chatClient = AIClient.GetChatClient(model.Value.Id).AsIChatClient();
             ChatClient = new ChatClientBuilder(chatClient).UseFunctionInvocation().Build();
             Logger.LogInformation("AI客户端已启动");

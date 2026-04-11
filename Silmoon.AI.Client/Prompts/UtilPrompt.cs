@@ -387,15 +387,15 @@ namespace Silmoon.AI.Client.Prompts
             如果不能，必须重写。
             """;
 
-        public static string LocalMachineAgentPrompt { get; set; } = $"""
-            你是一个人工智能助手，协助用户完成各种任务，以下是一些关于当前环境的信息：
-            操作系统: {Environment.OSVersion.VersionString}
-            当前目录: {Environment.CurrentDirectory}
-            当前时间: {DateTime.Now}
-            当前用户: {Environment.UserName}
-            当前用户主目录: {Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}
-
-            如果感觉或者疑似执行了错误的命令，务必将因为错误的命令产生的生产物或者资产清理掉，不要忘记执行完毕后的收尾动作。
+        public static string ContextPrompt { get; set; } = $"""
+            ## 当前你运行的环境信息 ##
+             - 当前时间: {DateTime.Now}
+             - 当前系统登录用户: {Environment.UserName}
+             - 当前操作系统: {Environment.OSVersion.VersionString}
+             - 当前系统平台: {Environment.OSVersion.Platform}
+             - 当前执行程序完整路径: {Environment.ProcessPath}
+             - 当前工作目录: {Environment.CurrentDirectory}
+             - 当前用户主目录: {Environment.GetFolderPath(Environment.SpecialFolder.UserProfile)}
             """;
     }
 }

@@ -21,23 +21,33 @@ public class NativeChatClient : INativeApiClient
     public bool EnableThinking { get; set; } = false;
     public bool EnableSearch { get; set; } = false;
     public List<MessageContent> MessageHistory { get; set; } = [];
-
+    public string SystemPrompt
+    {
+        set
+        {
+            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System);
+            if (value is null)
+            {
+                if (systemMessage is not null) MessageHistory.Remove(systemMessage);
+            }
+            else
+            {
+                if (systemMessage is null) MessageHistory.Insert(0, MessageContent.Create(Role.System, value));
+                else systemMessage.Content = value;
+            }
+        }
+        get => MessageHistory.FirstOrDefault(m => m.Role == Role.System)?.Content;
+    }
+    public Tool[] Tools { get; set; } = [];
 
     public NativeChatClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
     {
         ApiUrl = apiUrl;
         ApiKey = apiKey;
         Model = model;
-        SetSystemPrompt(systemPrompt);
+        SystemPrompt = systemPrompt;
 
         BuildHttpClient();
-    }
-    public void SetSystemPrompt(string systemPrompt)
-    {
-        if (systemPrompt is null) return;
-        var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System);
-        if (systemMessage is null) MessageHistory.Insert(0, MessageContent.Create(Role.System, systemPrompt));
-        else systemMessage.Content = systemPrompt;
     }
 
     void BuildHttpClient()
@@ -77,7 +87,7 @@ public class NativeChatClient : INativeApiClient
             var request = new Request(model ?? Model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking);
             request.EnableSearch = EnableSearch;
-            request.Tools = tools;
+            request.Tools = tools ?? Tools;
 
 
             Channel<StateSet<bool, Chunk>> channel = Channel.CreateUnbounded<StateSet<bool, Chunk>>();
@@ -149,7 +159,7 @@ public class NativeChatClient : INativeApiClient
             Request request = new Request(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking);
             request.EnableSearch = EnableSearch;
-            request.Tools = tools;
+            request.Tools = tools ?? Tools;
 
             var response = await HttpClient.CompletionsAsync(ApiUrl + completionsUrl, request);
 

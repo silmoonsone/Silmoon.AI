@@ -24,13 +24,32 @@ namespace Silmoon.AI.Client.ToolCall
         }
         public static StateSet<bool, object> WriteFile(string path, string content)
         {
-            File.WriteAllText(path, content);
-            return true.ToStateSet<object>(data: null);
+            try
+            {
+                File.WriteAllText(path, content);
+                return true.ToStateSet<object>(data: null);
+            }
+            catch (Exception e)
+            {
+                return false.ToStateSet<object>(data: null, message: $"Error writing file: {e.Message}");
+            }
         }
         public static StateSet<bool, object> ReadFile(string path)
         {
-            string content = File.ReadAllText(path);
-            return true.ToStateSet<object>(data: content);
+            try
+            {
+
+                if (File.Exists(path))
+                {
+                    string content = File.ReadAllText(path);
+                    return true.ToStateSet<object>(data: content);
+                }
+                else return false.ToStateSet<object>(data: null, message: $"File not found: {path}");
+            }
+            catch (Exception e)
+            {
+                return false.ToStateSet<object>(data: null, message: $"Error reading file: {e.Message}");
+            }
         }
         //public static StateSet<bool, object> DeleteFile(string path)
         //{
