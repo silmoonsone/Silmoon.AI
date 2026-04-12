@@ -1,4 +1,7 @@
-﻿using Silmoon.Extensions;
+﻿using Newtonsoft.Json.Linq;
+using Silmoon.AI.Client.OpenAI.Enums;
+using Silmoon.AI.Client.OpenAI.Models;
+using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
 using System.Collections.Generic;
@@ -8,7 +11,34 @@ namespace Silmoon.AI.Client.ToolCall
 {
     public class LocalFileSystemTool
     {
-        public static StateSet<bool, object> ExecuteTool(string action, string path, string content)
+        public static Tool[] GetTools()
+        {
+            return [
+                Tool.Create("FileTool", "It provides the ability to read and write text files, serving as an alternative when writing and reading large amounts of text using methods similar to command lines or terminals. This tool is not essential; it is simply used to reduce the probability of operations when manipulating large amounts of text files. It returns a JSON object, where Data is the text content.",
+                [
+                    new ToolParameterProperty("string", "The action to perform on the file system.", ["write", "read"], "action", true),
+                    new ToolParameterProperty("string", "The path of the file to operate on.", null, "path", true),
+                    new ToolParameterProperty("string", "This parameter is ignored when reading; it can be replaced with null.", null, "content", true),
+                ]),
+            ];
+        }
+        public static Task<StateSet<bool, MessageContent>> CallTool(string functionName, JObject parameters, string toolCallId)
+        {
+            StateSet<bool, MessageContent> result = null;
+
+            switch (functionName)
+            {
+                case "FileTool":
+                    var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"].Value<string>());
+                    result = true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
+                    break;
+                default:
+                    break;
+            }
+            return Task.FromResult(result);
+        }
+
+        static StateSet<bool, object> ExecuteTool(string action, string path, string content)
         {
             switch (action)
             {
@@ -22,7 +52,7 @@ namespace Silmoon.AI.Client.ToolCall
                     return false.ToStateSet<object>(data: $"Unsupported action: {action}");
             }
         }
-        public static StateSet<bool, object> WriteFile(string path, string content)
+        static StateSet<bool, object> WriteFile(string path, string content)
         {
             try
             {
@@ -34,7 +64,7 @@ namespace Silmoon.AI.Client.ToolCall
                 return false.ToStateSet<object>(data: null, message: $"Error writing file: {e.Message}");
             }
         }
-        public static StateSet<bool, object> ReadFile(string path)
+        static StateSet<bool, object> ReadFile(string path)
         {
             try
             {

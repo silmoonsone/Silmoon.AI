@@ -12,63 +12,91 @@ namespace Silmoon.AI.Client.ToolCall
 {
     public class CommandTool
     {
+        /// <summary>工具 schema 与内部逻辑使用的操作系统标识（大小写不敏感输入会归一化为此）。</summary>
+        public const string OsWindows = "Windows";
+        public const string OsMacOS = "MacOS";
+        public const string OsLinux = "Linux";
+
+        /// <summary>工具 schema 与内部逻辑使用的终端类型标识（大小写不敏感输入会归一化为此）。</summary>
+        public const string TerminalCmd = "CMD";
+        public const string TerminalPowerShell = "PowerShell";
+        public const string TerminalBash = "Bash";
+
+        /// <summary>有状态 shell 全局单例：任意时刻最多一个持久进程；新 <c>instanceId</c> 的 Execute 会替换并结束旧会话。</summary>
+        static readonly object StatefulCommandLock = new();
+        static string? ActiveStatefulInstanceId;
+        static StatefulTerminalSession? ActiveStatefulSession;
+        /// <summary>instanceId → 曾由 <see cref="CloseCommand"/> 主动关闭、或被新 instanceId 替换的时间（UTC）。</summary>
+        static readonly ConcurrentDictionary<string, DateTimeOffset> SessionClosedIntentionallyAt = new();
+        const double TombstoneRetentionHours = 168; // 7 天后遗忘，避免字典无限增长
+
         public static Tool[] GetTools()
         {
             return [
-                Tool.Create("CommandTool", "It can execute commands on the local computer and supports Windows, macOS, and Linux systems. Please note that you should not use this tool to execute dangerous commands, including power control, modifying or deleting important files and system files. Some high-risk operations require user confirmation before execution. Also, note that CommandTool does not save context with each call; each command is independent. For example, calling `cd ...` a second time renders the previous `cd` command's directory-changing behavior meaningless. Therefore, the `cd` command cannot be used alone. Consider using the \"&&\" in CMD and the \";;\" in PowerShell to pipe the `cd` command in conjunction with other commands. However, note that when using the `cd` command directly in CMD to change directories, switching between drives is ineffective; you must first change the drive letter and then use `cd` to change directories. If multiple commands are to be executed together, it is recommended to use PowerShell throughout!",
-                [
-                    new ToolParameterProperty("string", "The operating system on which to execute the command.", ["windows", "macos", "linux"], "os", true),
-                    new ToolParameterProperty("string", "The command to execute in cmd or powershell.", null, "command", true),
-                    new ToolParameterProperty("string", "Which command line should be used in Windows? What parameters are required in Windows? It supports cmd and PowerShell parameters; on other platforms, empty parameters or null parameters can be used, but PowerShell is recommended by default.", ["cmd", "powershell", null], "terminalType", true),
-                ]),
-                Tool.Create("StatefulShellExecute",
-                """
-                **Global singleton:** at most ONE persistent shell exists for the whole host. The FIRST StatefulShellExecute starts it; further calls **reuse** the shell only if you pass the **same** `instanceId`. If you call Execute with a **different** `instanceId`, the previous shell is terminated and replaced (the old id is recorded as ended—see GetSessionStatus).
+                Tool.Create("CommandTool", """
+                **When to use:** One-off commands where you do **not** need a persistent working directory or environment (each call is independent). Prefer this for quick checks, single pipelines, or anything that fits in one invocation.
 
-                Persistent shell session: runs one line of shell input bound to `instanceId`. Calls with the same id share cwd, env, and state (unlike stateless CommandTool).
+                **When NOT to use:** Multi-step work that depends on `cd`, exports, or long-running processes—use the four `StatefulCommand*` tools instead.
 
-                Workflow: (1) Choose a stable `instanceId` for the task. (2) Call StatefulShellExecute with `os`, `command`, `terminalType`, and `timeoutMilliseconds`. (3) The tool waits up to `timeoutMilliseconds`, then returns FULL output captured so far; it does NOT kill the shell on timeout. (4) Poll StatefulShellGetOutput with the **current active** `instanceId`. (5) StatefulShellGetSessionStatus to check health or id mismatch. (6) StatefulShellClose when done.
+                **Parameters:** `os` = Windows | MacOS | Linux. `terminalType` on Windows = CMD or PowerShell (required); on MacOS/Linux = Bash or omit for default. `command` = full command line. **Matching is case-insensitive** (e.g. `pwsh` → PowerShell).
 
-                `terminalType`: on Windows use `cmd` or `powershell`. On macOS/Linux pass `bash` or empty string.
-
-                Safety: same constraints as CommandTool—no destructive or privileged operations without explicit user approval.
-
-                Use stateless CommandTool for one‑off commands; use these Stateful shell tools when you need directory/env continuity, long‑running commands with polling, or session health checks.
+                **Rules:** No destructive/privileged actions without user approval. `cd` alone does not persist; chain with `&&` (CMD) or `;` (PowerShell) as needed.
                 """,
                 [
-                    new ToolParameterProperty("string", "Stable session key. Reuse for the same logical shell; use a new value for a fresh shell.", null, "instanceId", true),
-                    new ToolParameterProperty("string", "Host OS for the shell.", ["windows", "macos", "linux"], "os", true),
-                    new ToolParameterProperty("string", "Single line of shell input to execute (will be sent as one line; avoid raw newlines).", null, "command", true),
-                    new ToolParameterProperty("string", "Windows: `cmd` or `powershell`. macOS/Linux: `bash` or empty.", ["cmd", "powershell", "bash", null], "terminalType", true),
-                    new ToolParameterProperty("integer", "Milliseconds to wait after sending the command before returning accumulated output. Does not kill the process. Poll with StatefulShellGetOutput if longer runs are expected. Typical: 3000–60000.", null, "timeoutMilliseconds", true),
+                    new ToolParameterProperty("string", "Windows | MacOS | Linux (any casing accepted).", ["Windows", "MacOS", "Linux"], "os", true),
+                    new ToolParameterProperty("string", "Full command to run as a single line.", null, "command", true),
+                    new ToolParameterProperty("string", "Windows: CMD or PowerShell. MacOS/Linux: Bash or null/empty for default. Any casing accepted.", ["CMD", "PowerShell", "Bash", null], "terminalType", true),
                 ]),
-                Tool.Create("StatefulShellGetOutput",
-                """
-                Poll NEW terminal output for an existing `instanceId` created by StatefulShellExecute. Returns text appended since the last StatefulShellGetOutput (or since the last StatefulShellExecute return). Also indicates whether the shell process is still running. Use when a command may outlive the Execute timeout or when you need incremental logs.
-                """,
-                [
-                    new ToolParameterProperty("string", "Same instanceId as StatefulShellExecute.", null, "instanceId", true),
-                ]),
-                Tool.Create("StatefulShellGetSessionStatus",
-                """
-                Inspect the lifecycle of a persistent shell for `instanceId` without sending commands or reading streamed output. Returns one of: (1) **Running** — shell process is alive and managed by this host; (2) **Exited unexpectedly** — process has terminated (crash, exit, kill) while the session entry still exists—includes exit code; you should start a new shell (new instanceId or call Execute again per messages); (3) **Closed intentionally** — you (or the agent) already called StatefulShellClose; same id was released on purpose, not a surprise crash; (4) **Unknown / never created** — no active session and no recent intentional close record (never opened, typo, or tombstone expired after several days).
+                Tool.Create("StatefulCommandExecuteTool", """
+                **Family:** Stateful interactive shell (4 tools: Execute, GetOutput, GetSessionStatus, Close). **Use together** when you need cwd/env to persist, long commands, or polling.
 
-                Use when recovering from errors, before reusing an instanceId, or to tell user‑initiated close from unexpected termination.
+                **Singleton:** Only **one** persistent shell exists for the entire process. A **new** `instanceId` on Execute **replaces** the previous shell (old id is recorded as ended). Reuse the **same** `instanceId` to continue one session.
+
+                **Flow:** (1) Pick a stable `instanceId` (e.g. task name). (2) **StatefulCommandExecuteTool** — send one line of input; wait up to `timeoutMilliseconds`; returns **full** captured output so far; does **not** kill the shell on timeout. (3) **StatefulCommandGetOutputTool** — fetch **new** output since last poll (same `instanceId` as the **active** session). (4) **StatefulCommandGetSessionStatusTool** — check running / crashed / closed / wrong id. (5) **StatefulCommandCloseTool** — release the session when done.
+
+                **Parameters:** Same `os` / `terminalType` rules as CommandTool (case-insensitive). `timeoutMilliseconds`: typical 3000–60000.
+
+                **Safety:** Same as CommandTool; confirm destructive operations with the user.
                 """,
                 [
-                    new ToolParameterProperty("string", "Same instanceId as StatefulShellExecute.", null, "instanceId", true),
+                    new ToolParameterProperty("string", "Identifier for this shell session. Reuse for the same task; changing it on Execute replaces the previous shell.", null, "instanceId", true),
+                    new ToolParameterProperty("string", "Windows | MacOS | Linux (any casing accepted).", ["Windows", "MacOS", "Linux"], "os", true),
+                    new ToolParameterProperty("string", "One line of input for the shell (no embedded newlines).", null, "command", true),
+                    new ToolParameterProperty("string", "Windows: CMD or PowerShell. MacOS/Linux: Bash or empty. Any casing accepted.", ["CMD", "PowerShell", "Bash", null], "terminalType", true),
+                    new ToolParameterProperty("integer", "Wait this many ms after sending input, then return accumulated output (process keeps running). Use 3000–60000 for typical work.", null, "timeoutMilliseconds", true),
                 ]),
-                Tool.Create("StatefulShellClose",
-                """
-                Closes the persistent shell for `instanceId`, terminates the underlying process, and frees resources. Call when the session is no longer needed.
+                Tool.Create("StatefulCommandGetOutputTool", """
+                **When:** After **StatefulCommandExecuteTool**, to read **incremental** output (new text since your last GetOutput or since Execute returned). Use if the command may run longer than Execute’s timeout.
+
+                **Requirement:** `instanceId` must match the **currently active** shell (the one you last started or continued with Execute). If you use the wrong id, the response explains which id is active.
+
+                Does not send a new command; only reads buffered output and reports whether the shell process is still running.
                 """,
                 [
-                    new ToolParameterProperty("string", "Same instanceId as StatefulShellExecute.", null, "instanceId", true),
+                    new ToolParameterProperty("string", "Must match the active session’s instanceId (same value you passed to StatefulCommandExecuteTool).", null, "instanceId", true),
+                ]),
+                Tool.Create("StatefulCommandGetSessionStatusTool", """
+                **When:** Before assuming a session is healthy, after errors, or when unsure if the shell exited or was closed. **Does not** run a command or read streamed logs—only returns status text.
+
+                Explains: running OK; process exited unexpectedly (exit code); shell was **closed** by Close or **replaced** by a new instanceId; unknown id / never created.
+
+                If you query the wrong `instanceId`, the tool tells you the **active** instanceId so you can fix the next call.
+                """,
+                [
+                    new ToolParameterProperty("string", "instanceId to query (same format as Execute). Use the active id if you are unsure.", null, "instanceId", true),
+                ]),
+                Tool.Create("StatefulCommandCloseTool", """
+                **When:** The persistent shell for this task is finished; releases resources and kills the underlying process.
+
+                **Requirement:** `instanceId` must match the session you intend to close (usually the active one). No-op if the id does not match the active session.
+                """,
+                [
+                    new ToolParameterProperty("string", "Session to close—same instanceId as StatefulCommandExecuteTool for that shell.", null, "instanceId", true),
                 ]),
             ];
         }
         /// <summary>
-        /// 有状态持久 Shell 的工具定义（对应 <c>CommandTool.ExecuteCommand</c> / <c>GetCommandOutput</c> / <c>GetShellSessionStatus</c> / <c>CloseCommand</c>），供本类注入 MCP 或其它宿主合并进 <see cref="NativeChatClient.Tools"/>。
+        /// 分发 <see cref="GetTools"/> 中注册的 <c>CommandTool</c>（无状态）与 <c>StatefulCommandExecuteTool*</c>（有状态）工具；有状态实现对应 <c>ExecuteCommand</c> / <c>GetCommandOutput</c> / <c>GetShellSessionStatus</c> / <c>CloseCommand</c>。
         /// </summary>
         public static Task<StateSet<bool, MessageContent>> CallTool(string functionName, JObject parameters, string toolCallId)
         {
@@ -77,25 +105,39 @@ namespace Silmoon.AI.Client.ToolCall
             switch (functionName)
             {
                 case "CommandTool":
-                    var commandResult = Execute(parameters["os"].Value<string>(), parameters["command"].Value<string>(), parameters["terminalType"].Value<string>());
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
+                    try
+                    {
+                        var osN = NormalizeOs(parameters["os"]?.Value<string>());
+                        var ttN = NormalizeTerminal(parameters["terminalType"]?.Value<string>(), osN);
+                        var outText = Execute(osN, parameters["command"]?.Value<string>() ?? string.Empty, ttN);
+                        result = true.ToStateSet(MessageContent.Create(Role.Tool, outText, toolCallId));
+                    }
+                    catch (Exception ex)
+                    {
+                        result = false.ToStateSet<MessageContent>(null, $"[CommandTool] {ex.Message}");
+                    }
                     break;
-                case "StatefulShellExecute":
+                case "StatefulCommandExecuteTool":
                     var timeoutToken = parameters["timeoutMilliseconds"];
                     int timeoutMs = timeoutToken is null || timeoutToken.Type == JTokenType.Null ? 30_000 : timeoutToken.Value<int>();
-                    var shellExecResult = ExecuteCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty, parameters["os"]?.Value<string>() ?? string.Empty, parameters["command"]?.Value<string>() ?? string.Empty, parameters["terminalType"]?.Value<string>() ?? string.Empty, timeoutMs);
+                    var shellExecResult = ExecuteCommand(
+                        parameters["instanceId"]?.Value<string>() ?? string.Empty,
+                        parameters["os"]?.Value<string>() ?? string.Empty,
+                        parameters["command"]?.Value<string>() ?? string.Empty,
+                        parameters["terminalType"]?.Value<string>() ?? string.Empty,
+                        timeoutMs);
                     result = true.ToStateSet(MessageContent.Create(Role.Tool, shellExecResult, toolCallId));
                     break;
-                case "StatefulShellGetOutput":
+                case "StatefulCommandGetOutputTool":
                     var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, string.Empty, string.Empty, string.Empty);
                     result = true.ToStateSet(MessageContent.Create(Role.Tool, shellPollResult, toolCallId));
                     break;
-                case "StatefulShellGetSessionStatus":
+                case "StatefulCommandGetSessionStatusTool":
                     result = true.ToStateSet(MessageContent.Create(Role.Tool, GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty), toolCallId));
                     break;
-                case "StatefulShellClose":
+                case "StatefulCommandCloseTool":
                     CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, "Stateful shell session closed.", toolCallId));
+                    result = true.ToStateSet(MessageContent.Create(Role.Tool, "StatefulCommandCloseTool: session closed.", toolCallId));
                     break;
                 default:
                     break;
@@ -103,47 +145,59 @@ namespace Silmoon.AI.Client.ToolCall
             return Task.FromResult(result);
         }
 
-        /// <summary>有状态 shell 全局单例：任意时刻最多一个持久进程；新 <c>instanceId</c> 的 Execute 会替换并结束旧会话。</summary>
-        static readonly object StatefulShellGate = new();
-
-        static string? ActiveStatefulInstanceId;
-        static StatefulTerminalSession? ActiveStatefulSession;
-
-        /// <summary>instanceId → 曾由 <see cref="CloseCommand"/> 主动关闭、或被新 instanceId 替换的时间（UTC）。</summary>
-        static readonly ConcurrentDictionary<string, DateTimeOffset> SessionClosedIntentionallyAt = new();
-
-        const double TombstoneRetentionHours = 168; // 7 天后遗忘，避免字典无限增长
-
-        public static string Execute(string os, string command, string terminalType)
+        /// <summary>大小写不敏感：按小写分支，返回规范常量。</summary>
+        static string NormalizeOs(string? s) => string.IsNullOrWhiteSpace(s) ? throw new ArgumentException("os 不能为空。") : s.Trim().ToLowerInvariant() switch
         {
+            "windows" => OsWindows,
+            "macos" => OsMacOS,
+            "linux" => OsLinux,
+            _ => throw new NotSupportedException($"不支持的操作系统: {s}"),
+        };
+        static string NormalizeTerminal(string? s, string os)
+        {
+            if (os == OsWindows)
+            {
+                if (string.IsNullOrWhiteSpace(s)) throw new ArgumentException("Windows 上需要 terminalType（CMD 或 PowerShell）。");
+                return s.Trim().ToLowerInvariant() switch
+                {
+                    "cmd" => TerminalCmd,
+                    "powershell" or "pwsh" => TerminalPowerShell,
+                    _ => throw new NotSupportedException($"不支持的终端: {s}"),
+                };
+            }
+            if (string.IsNullOrWhiteSpace(s)) return TerminalBash;
+            return s.Trim().ToLowerInvariant() switch
+            {
+                "bash" or "sh" => TerminalBash,
+                _ => throw new NotSupportedException($"不支持的终端: {s}"),
+            };
+        }
+
+        static string Execute(string os, string command, string terminalType)
+        {
+            Console.WriteLineWithColor($"[{os}/{terminalType}] {command}", ConsoleColor.Green);
             switch (os)
             {
-                case "windows":
-                    if (terminalType == "cmd")
-                        return ExecuteCmd(command);
-                    else if (terminalType == "powershell")
-                        return ExecutePowerShell(command);
-                    else
-                        throw new NotSupportedException($"Unsupported terminal type: {terminalType}");
-                case "linux":
-                    return LinuxExecute(command);
-                case "macos":
-                    return MacOSExecute(command);
+                case OsWindows:
+                    if (terminalType == TerminalCmd) return ExecuteCmd(command);
+                    if (terminalType == TerminalPowerShell) return ExecutePowerShell(command);
+                    throw new NotSupportedException($"Unsupported terminal type for Windows: {terminalType}");
+                case OsLinux:
+                case OsMacOS:
+                    return ExecuteBash(command);
                 default:
                     throw new NotSupportedException($"Unsupported operating system: {os}");
             }
         }
         static string ExecuteCmd(string command)
         {
-            Console.WriteLineWithColor($"[CMD] {command}", ConsoleColor.Green);
-            var processInfo = new System.Diagnostics.ProcessStartInfo("cmd.exe", $"/c {command}")
+            using var process = Process.Start(new ProcessStartInfo("cmd.exe", $"/c {command}")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
-            };
-            var process = System.Diagnostics.Process.Start(processInfo);
+            }) ?? throw new InvalidOperationException("无法启动 cmd.exe");
             string output = process.StandardOutput.ReadToEnd();
             string error = process.StandardError.ReadToEnd();
             process.WaitForExit();
@@ -151,47 +205,27 @@ namespace Silmoon.AI.Client.ToolCall
         }
         static string ExecutePowerShell(string command)
         {
-            Console.WriteLineWithColor($"[PowerShell] {command}", ConsoleColor.Green);
-            var processInfo = new System.Diagnostics.ProcessStartInfo("powershell.exe", $"-Command {command}")
+            using var process = Process.Start(new ProcessStartInfo("powershell.exe", $"-Command {command}")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
-            };
-            var process = System.Diagnostics.Process.Start(processInfo);
+            }) ?? throw new InvalidOperationException("无法启动 powershell.exe");
             string output = process.StandardOutput.ReadToEnd();
             string error = process.StandardError.ReadToEnd();
             process.WaitForExit();
             return string.IsNullOrEmpty(error) ? output : error;
         }
-        static string MacOSExecute(string command)
+        static string ExecuteBash(string command)
         {
-            Console.WriteLineWithColor($"[macOS] {command}", ConsoleColor.Green);
-            var processInfo = new System.Diagnostics.ProcessStartInfo("/bin/bash", $"-c \"{command}\"")
+            using var process = Process.Start(new ProcessStartInfo("/bin/bash", $"-c \"{command}\"")
             {
                 RedirectStandardOutput = true,
                 RedirectStandardError = true,
                 UseShellExecute = false,
                 CreateNoWindow = true,
-            };
-            var process = System.Diagnostics.Process.Start(processInfo);
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
-            process.WaitForExit();
-            return string.IsNullOrEmpty(error) ? output : error;
-        }
-        static string LinuxExecute(string command)
-        {
-            Console.WriteLineWithColor($"[Linux] {command}", ConsoleColor.Green);
-            var processInfo = new System.Diagnostics.ProcessStartInfo("/bin/bash", $"-c \"{command}\"")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            };
-            var process = System.Diagnostics.Process.Start(processInfo);
+            }) ?? throw new InvalidOperationException("无法启动 /bin/bash");
             string output = process.StandardOutput.ReadToEnd();
             string error = process.StandardError.ReadToEnd();
             process.WaitForExit();
@@ -206,17 +240,19 @@ namespace Silmoon.AI.Client.ToolCall
         /// 超时不会结束子进程，只返回当前已累计的全部终端输出。
         /// </summary>
         /// <param name="timeoutMilliseconds">等待该命令输出的最长时间（毫秒）。到时间后返回当前缓冲区中的全部输出，shell 继续运行。</param>
-        public static string ExecuteCommand(string instanceId, string os, string command, string terminalType, int timeoutMilliseconds)
+        static string ExecuteCommand(string instanceId, string os, string command, string terminalType, int timeoutMilliseconds)
         {
             if (string.IsNullOrWhiteSpace(instanceId)) return "[CommandTool] instanceId 不能为空。";
             if (string.IsNullOrWhiteSpace(command)) return "[CommandTool] command 不能为空。";
 
             try
             {
+                var osNorm = NormalizeOs(os);
+                var terminalNorm = NormalizeTerminal(terminalType, osNorm);
                 string? supersededId = null;
                 StatefulTerminalSession session;
 
-                lock (StatefulShellGate)
+                lock (StatefulCommandLock)
                 {
                     PruneStaleTombstones();
 
@@ -228,7 +264,6 @@ namespace Silmoon.AI.Client.ToolCall
                         ActiveStatefulInstanceId = null;
                     }
 
-                    // 子进程已退出但槽位未清：允许同一 instanceId 重新创建，避免单例永久卡在死 shell 上
                     if (ActiveStatefulSession != null && string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal) && ActiveStatefulSession.IsShellProcessExited)
                     {
                         DisposeActiveStatefulSessionAndRecordTombstone(instanceId, ActiveStatefulSession);
@@ -239,14 +274,14 @@ namespace Silmoon.AI.Client.ToolCall
                     if (ActiveStatefulSession == null)
                     {
                         SessionClosedIntentionallyAt.TryRemove(instanceId, out DateTimeOffset _);
-                        ActiveStatefulSession = StatefulTerminalSession.Start(os, terminalType);
+                        ActiveStatefulSession = StatefulTerminalSession.Start(osNorm, terminalNorm);
                         ActiveStatefulInstanceId = instanceId;
                     }
 
                     session = ActiveStatefulSession;
                 }
 
-                var output = session.ExecuteCommand(os, command, terminalType, timeoutMilliseconds);
+                var output = session.ExecuteCommand(osNorm, command, terminalNorm, timeoutMilliseconds);
                 if (supersededId is not null)
                 {
                     return $"""
@@ -260,14 +295,14 @@ namespace Silmoon.AI.Client.ToolCall
             }
             catch (Exception ex)
             {
-                return $"[CommandTool] ExecuteCommand 失败: {ex.Message}";
+                return $"[CommandTool] {ex.Message}";
             }
         }
 
         /// <summary>
         /// 获取自上次调用本方法以来新增的终端输出，并报告 shell 是否仍在运行。
         /// </summary>
-        public static string GetCommandOutput(string instanceId, string os, string command, string terminalType)
+        static string GetCommandOutput(string instanceId, string os, string command, string terminalType)
         {
             _ = os;
             _ = command;
@@ -290,11 +325,11 @@ namespace Silmoon.AI.Client.ToolCall
         /// <summary>
         /// 关闭并移除该 instanceId 对应的持久化终端进程。
         /// </summary>
-        public static void CloseCommand(string instanceId)
+        static void CloseCommand(string instanceId)
         {
             if (string.IsNullOrWhiteSpace(instanceId)) return;
 
-            lock (StatefulShellGate)
+            lock (StatefulCommandLock)
             {
                 if (ActiveStatefulSession == null || !string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal)) return;
 
@@ -317,20 +352,15 @@ namespace Silmoon.AI.Client.ToolCall
         /// 查询某 <paramref name="instanceId"/> 对应的有状态 shell 是否存在、是否在运行、是否已异常退出，
         /// 或是否曾由 <see cref="CloseCommand"/> 主动关闭（与「从未创建」区分）。
         /// </summary>
-        public static string GetShellSessionStatus(string instanceId)
+        static string GetShellSessionStatus(string instanceId)
         {
-            if (string.IsNullOrWhiteSpace(instanceId))
-                return "[CommandTool] instanceId 不能为空。";
-
+            if (string.IsNullOrWhiteSpace(instanceId)) return "[CommandTool] instanceId 不能为空。";
             PruneStaleTombstones();
-
-            lock (StatefulShellGate)
+            lock (StatefulCommandLock)
             {
                 if (ActiveStatefulSession != null)
                 {
-                    if (string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal))
-                        return ActiveStatefulSession.DescribeSessionStatus();
-
+                    if (string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal)) return ActiveStatefulSession.DescribeSessionStatus();
                     return $"""
                         [CommandTool: 会话状态]
                         有状态模式为全局单例。当前活跃 instanceId: "{ActiveStatefulInstanceId}"（与查询的 "{instanceId}" 不一致）。
@@ -340,21 +370,19 @@ namespace Silmoon.AI.Client.ToolCall
             }
 
             if (SessionClosedIntentionallyAt.TryGetValue(instanceId, out var closedAt))
-            {
                 return $"""
                     [CommandTool: 会话状态]
                     instanceId: {instanceId}
-                    状态: 会话已结束（主动 StatefulShellClose，或已被新的有状态 instanceId 替换）。非异常崩溃记录。
+                    状态: 会话已结束（主动 StatefulCommandCloseTool，或已被新的有状态 instanceId 替换）。非异常崩溃记录。
                     结束时间 (UTC): {closedAt:O}
                     说明: 全局仅允许一个有状态 shell；再次 Execute 可新建（可沿用本 id 或新 id，新 Execute 会占用唯一槽位）。
                     """;
-            }
 
             return $"""
                 [CommandTool: 会话状态]
                 instanceId: {instanceId}
                 状态: 当前无匹配记录（可能从未创建、id 拼写错误，或 tombstone 已超过保留时间）。
-                说明: 请先 StatefulShellExecute，或确认 instanceId。
+                说明: 请先 StatefulCommandExecuteTool，或确认 instanceId。
                 """;
         }
 
@@ -385,7 +413,7 @@ namespace Silmoon.AI.Client.ToolCall
         {
             session = null;
             errorMessage = null;
-            lock (StatefulShellGate)
+            lock (StatefulCommandLock)
             {
                 if (ActiveStatefulSession == null)
                 {
@@ -435,16 +463,16 @@ namespace Silmoon.AI.Client.ToolCall
                 ProcessStartInfo psi;
                 switch (os)
                 {
-                    case "windows":
-                        if (terminalType == "cmd")
+                    case OsWindows:
+                        if (terminalType == TerminalCmd)
                             psi = new ProcessStartInfo("cmd.exe", "/Q");
-                        else if (terminalType == "powershell")
+                        else if (terminalType == TerminalPowerShell)
                             psi = new ProcessStartInfo("powershell.exe", "-NoLogo -NoProfile -Command -");
                         else
                             throw new NotSupportedException($"Unsupported terminal type: {terminalType}");
                         break;
-                    case "linux":
-                    case "macos":
+                    case OsLinux:
+                    case OsMacOS:
                         psi = new ProcessStartInfo("/bin/bash", "-s");
                         break;
                     default:
@@ -497,13 +525,12 @@ namespace Silmoon.AI.Client.ToolCall
                 lock (_executeGate)
                 {
                     ThrowIfDisposed();
-                    if (p.HasExited)
-                        return "[CommandTool] shell 进程已退出，请使用新的 instanceId 调用 ExecuteCommand。";
+                    if (p.HasExited) return "[CommandTool] shell 进程已退出，请使用新的 instanceId 调用 ExecuteCommand。";
 
-                    Console.WriteLineWithColor($"[Stateful {os}/{terminalType}] [{InstanceTag()}] {command}", ConsoleColor.Green);
+                    Console.WriteLineWithColor($"[{os}/{terminalType} (stateful)] [{InstanceTag()}] {command}", ConsoleColor.Green);
 
                     var stdin = p.StandardInput;
-                    var lineEnding = os == "windows" && terminalType == "cmd" ? "\r\n" : "\n";
+                    var lineEnding = os == OsWindows && terminalType == TerminalCmd ? "\r\n" : "\n";
                     stdin.Write(command);
                     stdin.Write(lineEnding);
                     stdin.Flush();
@@ -555,7 +582,7 @@ namespace Silmoon.AI.Client.ToolCall
                             [CommandTool: 会话状态]
                             状态: 运行中（活跃 shell，可继续 Execute / GetOutput）。
                             PID: {p.Id}
-                            说明: 会话仍由本进程托管；若命令长时间无输出，可用 StatefulShellGetOutput 轮询。
+                            说明: 会话仍由本进程托管；若命令长时间无输出，可用 StatefulCommandGetOutputTool 轮询。
                             """;
                     }
 

@@ -41,8 +41,7 @@ public class ClientService : IHostedService
     {
         Console.WriteLine();
         Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
-        StateSet<bool, MessageContent> result;
-
+        StateSet<bool, MessageContent> result = null;
         switch (functionName)
         {
             case "QuoteTool":
@@ -52,14 +51,7 @@ public class ClientService : IHostedService
             case "TradingController":
                 result = false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
                 break;
-            case "FileTool":
-                var fileSystemResult = LocalFileSystemTool.ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"].Value<string>());
-                result = true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
-                break;
             default:
-                result = await CommandTool.CallTool(functionName, parameters, toolCallId);
-                if (result is null)
-                    result = false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
                 break;
         }
         return result;

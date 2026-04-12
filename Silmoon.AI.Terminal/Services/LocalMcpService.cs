@@ -21,6 +21,7 @@ namespace Silmoon.AI.Terminal.Services
         {
             InjectSystemPrompting(nativeChatClient);
             InjectTools(nativeChatClient);
+            HijackToolCall(nativeChatClient);
         }
 
         void InjectSystemPrompting(NativeChatClient nativeChatClient)
@@ -31,22 +32,18 @@ namespace Silmoon.AI.Terminal.Services
         void InjectTools(NativeChatClient nativeChatClient)
         {
             nativeChatClient.Tools = [
-                Tool.Create("FileTool", "It provides the ability to read and write text files, serving as an alternative when writing and reading large amounts of text using methods similar to command lines or terminals. This tool is not essential; it is simply used to reduce the probability of operations when manipulating large amounts of text files. It returns a JSON object, where Data is the text content.",
-                [
-                    new ToolParameterProperty("string", "The action to perform on the file system.", ["write", "read"], "action", true),
-                    new ToolParameterProperty("string", "The path of the file to operate on.", null, "path", true),
-                    new ToolParameterProperty("string", "This parameter is ignored when reading; it can be replaced with null.", null, "content", true),
-                ]),
-                //Tool.Create("QuoteTool", "A tool to inquery quotes for symbol or product code.",
-                //[
-                //    new ToolParameterProperty("string", "The symbol or product code to query quotes for.", null, "symbol", true),
-                //]),
-                //Tool.Create("TradingController", "A tool to control trading client.",
-                //[
-                //    new ToolParameterProperty("string", "The action to perform on the trading client.", ["start", "stop", "pause", "resume"], "action", true),
-                //]),
+                .. nativeChatClient.Tools,
+                .. LocalFileSystemTool.GetTools(),
                 .. CommandTool.GetTools(),
             ];
+        }
+        void HijackToolCall(NativeChatClient nativeChatClient)
+        {
+            nativeChatClient.OnToolCallInvoke += async (functionName, parameters, toolCallId) =>
+            {
+                Console.WriteLineWithColor($"[TOOL CALL(HIJACKED)] {functionName}", ConsoleColor.Magenta);
+                return await CommandTool.CallTool(functionName, parameters, toolCallId);
+            };
         }
     }
 }

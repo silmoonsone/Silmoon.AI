@@ -3,7 +3,6 @@ using Newtonsoft.Json.Linq;
 using Silmoon.AI.Client.OpenAI.Enums;
 using Silmoon.AI.Client.OpenAI.Interfaces;
 using Silmoon.AI.Client.OpenAI.Models;
-using Silmoon.AI.Client.ToolCall;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System.Threading.Channels;
@@ -186,13 +185,14 @@ public class NativeChatClient : INativeApiClient
         }
     }
 
-    public async Task<StateSet<bool, MessageContent>> ToolCall(string functionName, JObject parameters, string toolCallId)
+    async Task<StateSet<bool, MessageContent>> ToolCall(string functionName, JObject parameters, string toolCallId)
     {
         try
         {
-            var result = await (OnToolCallInvoke?.Invoke(functionName, parameters, toolCallId) ?? Task.FromResult<StateSet<bool, MessageContent>>(null));
+            var result = await (OnToolCallInvoke?.Invoke(functionName, parameters, toolCallId));
+            result ??= false.ToStateSet<MessageContent>(null, $"function {functionName} not implemented.");
             result = await (OnToolCallFinished?.Invoke(result) ?? Task.FromResult(result));
-            return result ?? false.ToStateSet<MessageContent>(null, $"function {functionName} not implemented.");
+            return result;
         }
         catch (Exception ex)
         {
