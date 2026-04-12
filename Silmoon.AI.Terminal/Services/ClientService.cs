@@ -37,7 +37,7 @@ public class ClientService : IHostedService
         else Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Red);
         return Task.FromResult(arg);
     }
-    private Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId)
+    private async Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId)
     {
         Console.WriteLine();
         Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
@@ -52,19 +52,17 @@ public class ClientService : IHostedService
             case "TradingController":
                 result = false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
                 break;
-            case "CommandTool":
-                var commandResult = CommandTool.Execute(parameters["os"].Value<string>(), parameters["command"].Value<string>(), parameters["terminalType"].Value<string>());
-                result = true.ToStateSet(MessageContent.Create(Role.Tool, commandResult, toolCallId));
-                break;
             case "FileTool":
                 var fileSystemResult = LocalFileSystemTool.ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"].Value<string>());
                 result = true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
                 break;
             default:
-                result = false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
+                result = await CommandTool.CallTool(functionName, parameters, toolCallId);
+                if (result is null)
+                    result = false.ToStateSet<MessageContent>(null, $"函数 {functionName} 不存在。");
                 break;
         }
-        return Task.FromResult(result);
+        return result;
     }
 
     public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
