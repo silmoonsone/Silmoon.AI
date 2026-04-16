@@ -45,7 +45,7 @@ namespace Silmoon.AI.WinFormTest
             else Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Red);
             return Task.FromResult(arg);
         }
-        private async Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallInvoke(string functionName, Newtonsoft.Json.Linq.JObject parameters, string toolCallId)
+        private async Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState)
         {
             Console.WriteLine();
             Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);

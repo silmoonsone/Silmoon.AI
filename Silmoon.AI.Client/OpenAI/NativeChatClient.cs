@@ -37,7 +37,7 @@ public class NativeChatClient : INativeApiClient
         }
         get => MessageHistory.FirstOrDefault(m => m.Role == Role.System)?.Content;
     }
-    public Tool[] Tools { get; set; } = [];
+    public List<Tool> Tools { get; set; } = [];
 
     public NativeChatClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
     {
@@ -63,14 +63,14 @@ public class NativeChatClient : INativeApiClient
     }
 
 
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, List<Chunk> chunks = null, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
         {
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, List<Chunk> chunks = null, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
@@ -78,7 +78,7 @@ public class NativeChatClient : INativeApiClient
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         chunks ??= [];
         while (true)
@@ -144,13 +144,13 @@ public class NativeChatClient : INativeApiClient
         }
     }
 
-    public async Task<Response> CompletionsAsync(string content, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
-    public async Task<Response> CompletionsAsync(MessageContent content, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
+    public async Task<Response> CompletionsAsync(MessageContent content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<Response> CompletionsAsync(List<MessageContent> messageHistory, Tool[] tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(List<MessageContent> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         model ??= Model;
         while (true)
@@ -189,7 +189,12 @@ public class NativeChatClient : INativeApiClient
     {
         try
         {
-            var result = await (OnToolCallInvoke?.Invoke(functionName, parameters, toolCallId));
+            StateSet<bool, MessageContent> result = null;
+            foreach (ToolCallInvokeHandler handler in OnToolCallInvoke.GetInvocationList().Cast<ToolCallInvokeHandler>())
+            {
+                var tmpResult = await handler(functionName, parameters, toolCallId, result);
+                if (tmpResult is not null) result = tmpResult;
+            }
             result ??= false.ToStateSet<MessageContent>(null, $"function {functionName} not implemented.");
             result = await (OnToolCallFinished?.Invoke(result) ?? Task.FromResult(result));
             return result;
@@ -202,4 +207,4 @@ public class NativeChatClient : INativeApiClient
 
 }
 
-public delegate Task<StateSet<bool, MessageContent>> ToolCallInvokeHandler(string functionName, JObject parameters, string toolCallId);
+public delegate Task<StateSet<bool, MessageContent>> ToolCallInvokeHandler(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState);

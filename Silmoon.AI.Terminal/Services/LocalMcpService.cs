@@ -39,10 +39,13 @@ namespace Silmoon.AI.Terminal.Services
         }
         void HijackToolCall(NativeChatClient nativeChatClient)
         {
-            nativeChatClient.OnToolCallInvoke += async (functionName, parameters, toolCallId) =>
+            nativeChatClient.OnToolCallInvoke += async (functionName, parameters, toolCallId, toolMessageState) =>
             {
-                Console.WriteLineWithColor($"[TOOL CALL(HIJACKED)] {functionName}", ConsoleColor.Magenta);
-                return await CommandTool.CallTool(functionName, parameters, toolCallId);
+                if (toolMessageState is not null) return null;
+                Console.WriteLineWithColor($"[TOOL CALL(LocalMcpService)] {functionName}", ConsoleColor.Magenta);
+                var result = await CommandTool.CallTool(functionName, parameters, toolCallId);
+                if (result is null) result = await LocalFileSystemTool.CallTool(functionName, parameters, toolCallId);
+                return result;
             };
         }
     }

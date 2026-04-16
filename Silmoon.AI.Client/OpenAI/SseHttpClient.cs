@@ -87,11 +87,12 @@ public class SseHttpClient : HttpClient
                             else
                             {
                                 var chunkData = JsonConvert.DeserializeObject<Chunk>(json, serializerSettings);
-                                if (chunkData != null)
+                                if (chunkData != null && chunkData.Choices is not null)
                                 {
                                     chunks.Add(chunkData);
                                     await callback(true.ToStateSet(chunkData));
                                 }
+                                else await callback(false.ToStateSet<Chunk>(null, json));
                             }
                         }
                         catch (Exception ex)

@@ -24,7 +24,7 @@ public class Request
     [JsonProperty("enable_search")]
     public bool EnableSearch { get; set; }
     [JsonProperty("tools")]
-    public Tool[] Tools { get; set; }
+    public List<Tool> Tools { get; set; }
 
     public void SetEnableThinking(bool enableThinking)
     {

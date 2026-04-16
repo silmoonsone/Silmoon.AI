@@ -9,7 +9,7 @@ public class Tool
     public string Type { get; set; } = "function";
     [JsonProperty("function")]
     public ToolFunction Function { get; set; }
-    public Tool(string type)
+    public Tool(string type = "function")
     {
         Type = type;
     }
