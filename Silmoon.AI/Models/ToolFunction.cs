@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Text;
 
-namespace Silmoon.AI.Client.Models
+namespace Silmoon.AI.Models
 {
     public class ToolFunction
     {

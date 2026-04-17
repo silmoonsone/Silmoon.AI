@@ -1,13 +1,13 @@
 ﻿using Newtonsoft.Json.Linq;
-using Silmoon.AI.Client.OpenAI.Enums;
-using Silmoon.AI.Client.OpenAI.Models;
+using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Silmoon.AI.Client.ToolCall
+namespace Silmoon.AI.Tools.GeneralTools
 {
     public class LocalFileSystemTool
     {

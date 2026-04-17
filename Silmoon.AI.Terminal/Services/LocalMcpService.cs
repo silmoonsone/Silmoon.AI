@@ -1,7 +1,5 @@
 ﻿using Silmoon.AI.Client.OpenAI;
-using Silmoon.AI.Client.OpenAI.Models;
-using Silmoon.AI.Client.Prompts;
-using Silmoon.AI.Client.ToolCall;
+using Silmoon.AI.Tools;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using System;
@@ -33,7 +31,7 @@ namespace Silmoon.AI.Terminal.Services
         {
             nativeChatClient.Tools = [
                 .. nativeChatClient.Tools,
-                .. LocalFileSystemTool.GetTools(),
+                .. FileTool.GetTools(),
                 .. CommandTool.GetTools(),
             ];
         }
@@ -44,7 +42,7 @@ namespace Silmoon.AI.Terminal.Services
                 if (toolMessageState is not null) return null;
                 Console.WriteLineWithColor($"[TOOL CALL(LocalMcpService)] {functionName}", ConsoleColor.Magenta);
                 var result = await CommandTool.CallTool(functionName, parameters, toolCallId);
-                if (result is null) result = await LocalFileSystemTool.CallTool(functionName, parameters, toolCallId);
+                if (result is null) result = await FileTool.CallTool(functionName, parameters, toolCallId);
                 return result;
             };
         }

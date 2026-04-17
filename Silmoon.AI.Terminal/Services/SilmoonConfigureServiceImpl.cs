@@ -41,6 +41,7 @@ namespace Silmoon.AI.Terminal.Services
             ApiUrl = Models[defaultModelName].ApiUrl;
             Key = Models[defaultModelName].ApiKey;
             ModelName = Models[defaultModelName].ModelName;
+            logger.LogInformation($"Model: {ModelName}, ApiUrl: {ApiUrl}");
         }
     }
 }

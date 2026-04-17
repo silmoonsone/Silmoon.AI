@@ -1,8 +1,8 @@
 using System;
-using Silmoon.AI.Client.OpenAI.Enums;
+using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.Extensions;
 
-namespace Silmoon.AI.Client.OpenAI.Models;
+namespace Silmoon.AI.Models.OpenAI.Models;
 
 public class Result
 {

@@ -1,10 +1,10 @@
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Client.OpenAI;
-using Silmoon.AI.Client.OpenAI.Enums;
-using Silmoon.AI.Client.OpenAI.Models;
 using Silmoon.AI.Client.Prompts;
-using Silmoon.AI.Client.ToolCall;
+using Silmoon.AI.Tools;
+using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using Silmoon.Models;
@@ -50,7 +50,7 @@ public class ClientService : IHostedService
                 result = false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
                 break;
             case "FileTool":
-                var fileSystemResult = LocalFileSystemTool.CallTool(functionName, parameters, toolCallId);
+                var fileSystemResult = FileTool.CallTool(functionName, parameters, toolCallId);
                 result = true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
                 break;
             default:
@@ -71,7 +71,7 @@ public class ClientService : IHostedService
             [
                 new ToolParameterProperty("string", "The action to perform on the trading client.", ["start", "stop", "pause", "resume"], "action", true),
             ]),
-            .. LocalFileSystemTool.GetTools(),
+            .. FileTool.GetTools(),
             .. CommandTool.GetTools(),
         ];
     }

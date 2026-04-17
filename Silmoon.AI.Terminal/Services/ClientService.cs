@@ -1,10 +1,9 @@
 using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Client.OpenAI;
-using Silmoon.AI.Client.OpenAI.Enums;
-using Silmoon.AI.Client.OpenAI.Models;
 using Silmoon.AI.Client.Prompts;
-using Silmoon.AI.Client.ToolCall;
+using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using Silmoon.Models;

@@ -1,7 +1,7 @@
 using System;
 using Newtonsoft.Json;
 
-namespace Silmoon.AI.Client.OpenAI.Models;
+namespace Silmoon.AI.Models.OpenAI.Models;
 
 public class Choice
 {

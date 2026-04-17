@@ -21,6 +21,8 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.WinFormTest", "S
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.Terminal", "Silmoon.AI.Terminal\Silmoon.AI.Terminal.csproj", "{210D0239-B62A-4E73-A925-E1A85A1A70F0}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.Tools", "Silmoon.AI.Tools\Silmoon.AI.Tools.csproj", "{EECE411D-0813-4A64-A4B1-A66E984BA34C}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -47,6 +49,10 @@ Global
 		{210D0239-B62A-4E73-A925-E1A85A1A70F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{210D0239-B62A-4E73-A925-E1A85A1A70F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{210D0239-B62A-4E73-A925-E1A85A1A70F0}.Release|Any CPU.Build.0 = Release|Any CPU
+		{EECE411D-0813-4A64-A4B1-A66E984BA34C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{EECE411D-0813-4A64-A4B1-A66E984BA34C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{EECE411D-0813-4A64-A4B1-A66E984BA34C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{EECE411D-0813-4A64-A4B1-A66E984BA34C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

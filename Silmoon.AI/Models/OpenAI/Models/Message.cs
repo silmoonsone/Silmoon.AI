@@ -1,7 +1,7 @@
 using Newtonsoft.Json;
-using Silmoon.AI.Client.OpenAI.Enums;
+using Silmoon.AI.Models.OpenAI.Enums;
 
-namespace Silmoon.AI.Client.OpenAI.Models;
+namespace Silmoon.AI.Models.OpenAI.Models;
 
 public interface IContent
 {

@@ -1,8 +1,8 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Silmoon.AI.Client.OpenAI.Enums;
-using Silmoon.AI.Client.OpenAI.Interfaces;
-using Silmoon.AI.Client.OpenAI.Models;
+using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.Models.OpenAI.Interfaces;
+using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System.Threading.Channels;

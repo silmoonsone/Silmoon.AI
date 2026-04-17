@@ -2,7 +2,7 @@ using System;
 using System.Net;
 using System.Text;
 using Newtonsoft.Json;
-using Silmoon.AI.Client.OpenAI.Models;
+using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 
