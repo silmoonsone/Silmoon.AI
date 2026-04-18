@@ -1,5 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
+using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
@@ -10,7 +12,7 @@ using System.Text;
 
 namespace Silmoon.AI.Tools
 {
-    public class CommandTool
+    public class CommandTool : ExecuteTool
     {
         /// <summary>工具 schema 与内部逻辑使用的操作系统标识（大小写不敏感输入会归一化为此）。</summary>
         public const string OsWindows = "Windows";
@@ -29,6 +31,10 @@ namespace Silmoon.AI.Tools
         /// <summary>instanceId → 曾由 <see cref="CloseCommand"/> 主动关闭、或被新 instanceId 替换的时间（UTC）。</summary>
         static readonly ConcurrentDictionary<string, DateTimeOffset> SessionClosedIntentionallyAt = new();
         const double TombstoneRetentionHours = 168; // 7 天后遗忘，避免字典无限增长
+
+        public CommandTool() => Tools = GetTools();
+        public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState) => await CallTool(functionName, parameters, toolCallId);
+
 
         public static Tool[] GetTools()
         {

@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Silmoon.AI.Handlers;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
@@ -9,7 +10,7 @@ using System.Threading.Channels;
 
 namespace Silmoon.AI.Client.OpenAI;
 
-public class NativeChatClient : INativeApiClient
+public class NativeChatClient : INativeChatClient
 {
     public event ToolCallInvokeHandler OnToolCallInvoke;
     public event Func<StateSet<bool, MessageContent>, Task<StateSet<bool, MessageContent>>> OnToolCallFinished;
@@ -206,5 +207,3 @@ public class NativeChatClient : INativeApiClient
     }
 
 }
-
-public delegate Task<StateSet<bool, MessageContent>> ToolCallInvokeHandler(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState);

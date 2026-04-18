@@ -1,5 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
+using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
@@ -9,8 +11,10 @@ using System.Text;
 
 namespace Silmoon.AI.Tools
 {
-    public class FileTool
+    public class FileTool : ExecuteTool
     {
+        public FileTool() => Tools = GetTools();
+        public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState) => await CallTool(functionName, parameters, toolCallId);
         public static Tool[] GetTools()
         {
             return [
@@ -22,6 +26,8 @@ namespace Silmoon.AI.Tools
                 ]),
             ];
         }
+
+
         public static Task<StateSet<bool, MessageContent>> CallTool(string functionName, JObject parameters, string toolCallId)
         {
             StateSet<bool, MessageContent> result = null;
