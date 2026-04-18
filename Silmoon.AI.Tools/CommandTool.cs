@@ -9,6 +9,7 @@ using System;
 using System.Collections.Concurrent;
 using System.Diagnostics;
 using System.Text;
+using System.Threading;
 
 namespace Silmoon.AI.Tools
 {
@@ -40,64 +41,69 @@ namespace Silmoon.AI.Tools
         {
             return [
                 Tool.Create("CommandTool", """
-                **When to use:** One-off commands where you do **not** need a persistent working directory or environment (each call is independent). Prefer this for quick checks, single pipelines, or anything that fits in one invocation.
+                **Stateless:** new process each call—no persistent cwd/env.
 
-                **When NOT to use:** Multi-step work that depends on `cd`, exports, or long-running processes—use the four `StatefulCommand*` tools instead.
+                **Use only for** fast, one-shot commands whose output is complete when the process exits (short `&&`/`;` pipeline on **one line** is OK). **Not for:** waiting/streaming output, long builds/tests, polling, or multi-step same-shell work—use **StatefulCommand*** (`Execute` + `GetOutput`).
 
-                **Parameters:** `os` = Windows | MacOS | Linux. `terminalType` on Windows = CMD or PowerShell (required); on MacOS/Linux = Bash or omit for default. `command` = full command line. **Matching is case-insensitive** (e.g. `pwsh` → PowerShell).
+                **Params:** `os` = Windows|MacOS|Linux; Windows needs `terminalType` CMD|PowerShell; Mac/Linux Bash or omit. Case-insensitive.
 
-                **Rules:** No destructive/privileged actions without user approval. `cd` alone does not persist; chain with `&&` (CMD) or `;` (PowerShell) as needed.
+                **Safety:** no destructive/privileged ops without user approval.
                 """,
                 [
-                    new ToolParameterProperty("string", "Windows | MacOS | Linux (any casing accepted).", ["Windows", "MacOS", "Linux"], "os", true),
-                    new ToolParameterProperty("string", "Full command to run as a single line.", null, "command", true),
-                    new ToolParameterProperty("string", "Windows: CMD or PowerShell. MacOS/Linux: Bash or null/empty for default. Any casing accepted.", ["CMD", "PowerShell", "Bash", null], "terminalType", true),
+                    new ToolParameterProperty("string", "os", "Windows | MacOS | Linux.", ["Windows", "MacOS", "Linux"], true),
+                    new ToolParameterProperty("string", "command", "Single quick line; not for long/wait-heavy work → StatefulCommand*.", null, true),
+                    new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or null.", ["CMD", "PowerShell", "Bash", null], true),
                 ]),
                 Tool.Create("StatefulCommandExecuteTool", """
-                **Family:** Stateful interactive shell (4 tools: Execute, GetOutput, GetSessionStatus, Close). **Use together** when you need cwd/env to persist, long commands, or polling.
+                **Stateful:** one persistent shell—use for waiting/streaming/polling, multi-step same cwd/env, or anything stateless **CommandTool** cannot do.
 
-                **Singleton:** Only **one** persistent shell exists for the entire process. A **new** `instanceId` on Execute **replaces** the previous shell (old id is recorded as ended). Reuse the **same** `instanceId` to continue one session.
+                **Policy:** Keep the same **`instanceId`** for the whole task. **Do not** call **Close** after a single step—only when the user asks or **all** work in this shell is done. Remember: id, cwd, SSH vs local (below), remaining steps. If alive/unknown → **GetSessionStatus**, not Close.
 
-                **Flow:** (1) Pick a stable `instanceId` (e.g. task name). (2) **StatefulCommandExecuteTool** — send one line of input; wait up to `timeoutMilliseconds`; returns **full** captured output so far; does **not** kill the shell on timeout. (3) **StatefulCommandGetOutputTool** — fetch **new** output since last poll (same `instanceId` as the **active** session). (4) **StatefulCommandGetSessionStatusTool** — check running / crashed / closed / wrong id. (5) **StatefulCommandCloseTool** — release the session when done.
+                **Waits (human + transparency):** Prefer **asking the user** to pick `timeoutMilliseconds` / GetOutput’s `waitMilliseconds` (or offer 3s/10s/30s) when duration is unclear; follow a stated budget. **In the same assistant message as each Execute/GetOutput call**, state the exact values (ms + seconds, e.g. `timeoutMilliseconds=45000` → 45s after send; GetOutput `waitMilliseconds=0` = read now). No vague-only lines (“wait until done” / “轮询” without numbers). Each poll: say that call’s wait or 0. Ask first if not agreed.
 
-                **Parameters:** Same `os` / `terminalType` rules as CommandTool (case-insensitive). `timeoutMilliseconds`: typical 3000–60000.
+                **Singleton:** one active shell; **new** `instanceId` replaces the old. Don’t switch id mid-task.
 
-                **Safety:** Same as CommandTool; confirm destructive operations with the user.
+                **One line per Execute**—no `&&`/`;` multi-step in one `command`; separate calls.
+
+                **SSH:** After `ssh user@host`, later lines run **on the remote** until `exit`/`logout`. Track local vs remote; don’t mix paths/`localhost`. Confirm with `hostname`/`pwd` if unsure.
+
+                **`timeoutMilliseconds`:** ms to sleep **after sending the line** before returning buffered output (shell keeps running). Larger = longer stall before you see the reply—use **~2–8s** for quick work, **30–60s** only for slow I/O; poll **GetOutput** instead of only maxing timeout.
+
+                **Flow:** Execute → GetOutput (optional `waitMilliseconds`) → GetSessionStatus if unsure → **Close** rarely (see Close tool).
+
+                **Params:** same `os`/`terminalType` as stateless CommandTool.
+
+                **Safety:** as stateless CommandTool.
                 """,
                 [
-                    new ToolParameterProperty("string", "Identifier for this shell session. Reuse for the same task; changing it on Execute replaces the previous shell.", null, "instanceId", true),
-                    new ToolParameterProperty("string", "Windows | MacOS | Linux (any casing accepted).", ["Windows", "MacOS", "Linux"], "os", true),
-                    new ToolParameterProperty("string", "One line of input for the shell (no embedded newlines).", null, "command", true),
-                    new ToolParameterProperty("string", "Windows: CMD or PowerShell. MacOS/Linux: Bash or empty. Any casing accepted.", ["CMD", "PowerShell", "Bash", null], "terminalType", true),
-                    new ToolParameterProperty("integer", "Wait this many ms after sending input, then return accumulated output (process keeps running). Use 3000–60000 for typical work.", null, "timeoutMilliseconds", true),
+                    new ToolParameterProperty("string", "instanceId", "One stable id for the entire task; reuse on Execute/GetOutput/GetSessionStatus until done.", null, true),
+                    new ToolParameterProperty("string", "os", "Windows | MacOS | Linux.", ["Windows", "MacOS", "Linux"], true),
+                    new ToolParameterProperty("string", "command", "Single line, no newlines; no multi-step chaining—separate Executes.", null, true),
+                    new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or empty.", ["CMD", "PowerShell", "Bash", null], true),
+                    new ToolParameterProperty("integer", "timeoutMilliseconds", "Ms after send before snapshot; shell survives. State ms+seconds to user. Typical 2000–8000 fast; 30000+ slow. Poll GetOutput if needed.", null, true),
                 ]),
                 Tool.Create("StatefulCommandGetOutputTool", """
-                **When:** After **StatefulCommandExecuteTool**, to read **incremental** output (new text since your last GetOutput or since Execute returned). Use if the command may run longer than Execute’s timeout.
+                Read **new** stdout/stderr since last GetOutput/Execute; no new input. Same **`instanceId`** as Execute; wrong id → tool returns active id (update your memory). If SSH session active, output is **remote**.
 
-                **Requirement:** `instanceId` must match the **currently active** shell (the one you last started or continued with Execute). If you use the wrong id, the response explains which id is active.
+                **`waitMilliseconds`:** sleep this long **before** reading (0 = now). Use >0 for trickling output (`ping`, logs). Same **wait transparency** as Execute (state ms+seconds to user; ask user when unclear). Typical 1000–5000 if pre-waiting.
 
-                Does not send a new command; only reads buffered output and reports whether the shell process is still running.
+                Reports whether shell still runs.
                 """,
                 [
-                    new ToolParameterProperty("string", "Must match the active session’s instanceId (same value you passed to StatefulCommandExecuteTool).", null, "instanceId", true),
+                    new ToolParameterProperty("string", "instanceId", "Must match active session (same as Execute).", null, true),
+                    new ToolParameterProperty("integer", "waitMilliseconds", "Pre-read wait ms (0=immediate). State value to user. Ask user if unsure. Max clamped server-side.", null, false),
                 ]),
                 Tool.Create("StatefulCommandGetSessionStatusTool", """
-                **When:** Before assuming a session is healthy, after errors, or when unsure if the shell exited or was closed. **Does not** run a command or read streamed logs—only returns status text.
-
-                Explains: running OK; process exited unexpectedly (exit code); shell was **closed** by Close or **replaced** by a new instanceId; unknown id / never created.
-
-                If you query the wrong `instanceId`, the tool tells you the **active** instanceId so you can fix the next call.
+                Status only (no command, no log tail). Prefer this over **Close** when unsure if shell is alive. Wrong `instanceId` → response includes **active** id—use it on next Execute/GetOutput. SSH local/remote not labeled here—you track that.
                 """,
                 [
-                    new ToolParameterProperty("string", "instanceId to query (same format as Execute). Use the active id if you are unsure.", null, "instanceId", true),
+                    new ToolParameterProperty("string", "instanceId", "Believed active id; tool may return the real active id.", null, true),
                 ]),
                 Tool.Create("StatefulCommandCloseTool", """
-                **When:** The persistent shell for this task is finished; releases resources and kills the underlying process.
-
-                **Requirement:** `instanceId` must match the session you intend to close (usually the active one). No-op if the id does not match the active session.
+                **Rare.** Default: **keep shell open** with same `instanceId`. Call only if user asked to close **or** all work in this shell is **done** and no more Execute needed. **Not** for cleanup, habit, or end-of-turn—next user message may need this shell. Matching `instanceId` required; after close, forget this id (new Execute = new session).
                 """,
                 [
-                    new ToolParameterProperty("string", "Session to close—same instanceId as StatefulCommandExecuteTool for that shell.", null, "instanceId", true),
+                    new ToolParameterProperty("string", "instanceId", "Active session id to close.", null, true),
                 ]),
             ];
         }
@@ -135,7 +141,11 @@ namespace Silmoon.AI.Tools
                     result = true.ToStateSet(MessageContent.Create(Role.Tool, shellExecResult, toolCallId));
                     break;
                 case "StatefulCommandGetOutputTool":
-                    var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, string.Empty, string.Empty, string.Empty);
+                    var waitOutToken = parameters["waitMilliseconds"];
+                    int waitBeforeReadMs = waitOutToken is null || waitOutToken.Type == JTokenType.Null ? 0 : waitOutToken.Value<int>();
+                    if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
+                    if (waitBeforeReadMs > 180_000) waitBeforeReadMs = 180_000;
+                    var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
                     result = true.ToStateSet(MessageContent.Create(Role.Tool, shellPollResult, toolCallId));
                     break;
                 case "StatefulCommandGetSessionStatusTool":
@@ -308,11 +318,9 @@ namespace Silmoon.AI.Tools
         /// <summary>
         /// 获取自上次调用本方法以来新增的终端输出，并报告 shell 是否仍在运行。
         /// </summary>
-        static string GetCommandOutput(string instanceId, string os, string command, string terminalType)
+        /// <param name="waitBeforeReadMilliseconds">在读取缓冲区前额外等待的毫秒数（0 表示立即读取）。用于 ping 等输出陆续到达的场景。</param>
+        static string GetCommandOutput(string instanceId, int waitBeforeReadMilliseconds = 0)
         {
-            _ = os;
-            _ = command;
-            _ = terminalType;
             if (string.IsNullOrWhiteSpace(instanceId))
                 return "[CommandTool] instanceId 不能为空。";
 
@@ -320,7 +328,7 @@ namespace Silmoon.AI.Tools
 
             try
             {
-                return session!.GetIncrementalOutput();
+                return session!.GetIncrementalOutput(waitBeforeReadMilliseconds);
             }
             catch (Exception ex)
             {
@@ -608,10 +616,14 @@ namespace Silmoon.AI.Tools
                 }
             }
 
-            public string GetIncrementalOutput()
+            /// <param name="waitBeforeReadMilliseconds">在加锁读取缓冲区之前先等待的毫秒数，便于收集陆续到达的输出（如 ping）。0 表示不等待。</param>
+            public string GetIncrementalOutput(int waitBeforeReadMilliseconds = 0)
             {
                 ThrowIfDisposed();
                 var p = _process ?? throw new InvalidOperationException("进程不可用。");
+
+                if (waitBeforeReadMilliseconds > 0)
+                    Thread.Sleep(waitBeforeReadMilliseconds);
 
                 lock (_bufferLock)
                 {

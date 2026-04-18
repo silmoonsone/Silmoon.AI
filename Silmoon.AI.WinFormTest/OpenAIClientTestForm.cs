@@ -87,11 +87,11 @@ namespace Silmoon.AI.WinFormTest
             return [
                 Tool.Create("QuoteTool", "A tool to inquery quotes for symbol or product code.",
                 [
-                    new ToolParameterProperty("string", "The symbol or product code to query quotes for.", null, "symbol", true),
+                    new ToolParameterProperty("string", "symbol", "The symbol or product code to query quotes for.", null, true),
                 ]),
                 Tool.Create("TradingController", "A tool to control trading client.",
                 [
-                    new ToolParameterProperty("string", "The action to perform on the trading client.", ["start", "stop", "pause", "resume"], "action", true),
+                    new ToolParameterProperty("string", "action", "The action to perform on the trading client.", ["start", "stop", "pause", "resume"], true),
                 ]),
                 .. FileTool.GetTools(),
                 .. CommandTool.GetTools(),

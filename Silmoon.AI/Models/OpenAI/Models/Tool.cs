@@ -83,13 +83,12 @@ public class ToolParameterProperty
     [JsonIgnore]
     public bool IsRequired { get; set; }
 
-    public ToolParameterProperty(string type, string description, List<object> @enum = null, string name = null, bool isRequired = false)
+    public ToolParameterProperty(string type, string name, string description, List<object> @enum = null, bool isRequired = false)
     {
         Type = type;
+        Name = name;
         Description = description;
         Enum = @enum;
-
-        Name = name;
         IsRequired = isRequired;
     }
 }

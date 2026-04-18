@@ -18,11 +18,15 @@ namespace Silmoon.AI.Tools
         public static Tool[] GetTools()
         {
             return [
-                Tool.Create("FileTool", "It provides the ability to read and write text files, serving as an alternative when writing and reading large amounts of text using methods similar to command lines or terminals. This tool is not essential; it is simply used to reduce the probability of operations when manipulating large amounts of text files. It returns a JSON object, where Data is the text content.",
+                Tool.Create("FileTool", """
+                UTF-8 **text** read/write whole file. Prefer over huge terminal pipes for configs/logs/code. **Not:** binary; unconfirmed sensitive paths; shell-specific behavior → command tools.
+
+                Response: JSON result; **read** returns file text in payload; **write** replaces entire file (create parents first).
+                """,
                 [
-                    new ToolParameterProperty("string", "The action to perform on the file system.", ["write", "read"], "action", true),
-                    new ToolParameterProperty("string", "The path of the file to operate on.", null, "path", true),
-                    new ToolParameterProperty("string", "This parameter is ignored when reading; it can be replaced with null.", null, "content", true),
+                    new ToolParameterProperty("string", "action", "`read` | `write` (full replace).", ["write", "read"], true),
+                    new ToolParameterProperty("string", "path", "File path (parents must exist for write).", null, true),
+                    new ToolParameterProperty("string", "content", "Write: full text. Read: ignored.", null, true),
                 ]),
             ];
         }
