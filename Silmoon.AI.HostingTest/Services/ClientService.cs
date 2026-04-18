@@ -27,7 +27,7 @@ public class ClientService : IHostedService
         NativeChatClient.OnToolCallFinished += NativeChatClient_OnToolCallFinished;
         NativeChatClient.Tools.AddRange(makeTools());
         // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool
-        new ContinuationMemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
+        new MemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
         //NativeChatClient.EnableThinking = true;
     }
 

@@ -7,6 +7,7 @@ using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System.Threading.Channels;
+using Silmoon.AI.Tools;
 
 namespace Silmoon.AI.Client.OpenAI;
 
@@ -60,9 +61,8 @@ public class NativeChatClient : INativeChatClient
     public void ResetHistory(string continuation = null)
     {
         var systemPrompt = SystemPrompt;
-        if (systemPrompt is not null) MessageHistory = [MessageContent.Create(Role.System, SystemPrompt)];
-        else MessageHistory.Clear();
-
+        MessageHistory.Clear();
+        if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, systemPrompt));
         if (!continuation.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.User, continuation));
     }
 
@@ -136,7 +136,10 @@ public class NativeChatClient : INativeChatClient
                         string functionName = result.ToolCalls[0].Function.Name;
                         JObject parameters = result.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ? [] : JsonConvert.DeserializeObject<JObject>(result.ToolCalls[0].Function.Arguments);
                         var toolCallResult = await ToolCall(functionName, parameters, result.ToolCalls[0].Id);
-                        if (toolCallResult.State) messageHistory.Add(toolCallResult.Data);
+                        if (toolCallResult.State)
+                        {
+                            if (functionName != MemoryTool.ApplyFunctionName) messageHistory.Add(toolCallResult.Data);
+                        }
                         else messageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), result.ToolCalls[0].Id));
                         continue;
                     }
@@ -180,7 +183,10 @@ public class NativeChatClient : INativeChatClient
                     string functionName = firstChoice?.Message?.ToolCalls[0].Function.Name;
                     JObject parameters = firstChoice?.Message?.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ?? false ? [] : JsonConvert.DeserializeObject<JObject>(firstChoice?.Message?.ToolCalls[0].Function.Arguments);
                     var toolCallResult = await ToolCall(functionName, parameters, firstChoice?.Message?.ToolCalls[0].Id);
-                    if (toolCallResult.State) messageHistory.Add(toolCallResult.Data);
+                    if (toolCallResult.State)
+                    {
+                        if (functionName != MemoryTool.ApplyFunctionName) messageHistory.Add(toolCallResult.Data);
+                    }
                     else messageHistory.Add(MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id));
                     continue;
                 }

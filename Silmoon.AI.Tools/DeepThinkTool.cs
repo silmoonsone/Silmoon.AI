@@ -36,11 +36,12 @@ namespace Silmoon.AI.Tools
             {
                 string content = parameters["content"].ToString();
                 string system = parameters["system"]?.ToString();
-                NativeChatClient.SystemPrompt = system;
+
+                if (system is not null) NativeChatClient.SystemPrompt = system;
 
                 List<Chunk> chunks = [];
                 Console.WriteLineWithColor("Agent response start:", ConsoleColor.Green, ConsoleColor.Blue);
-                await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(content, chunks))
+                await foreach (var chunk in NativeChatClient.CompletionsStreamAsync([MessageContent.Create(Role.User, content)], chunks))
                 {
                     if (chunk.State)
                     {
