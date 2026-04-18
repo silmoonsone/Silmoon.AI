@@ -1,4 +1,4 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Handlers;
 using Silmoon.AI.Models.OpenAI.Enums;
@@ -21,6 +21,7 @@ public class NativeChatClient : INativeChatClient
     public bool EnableThinking { get; set; } = false;
     public bool EnableSearch { get; set; } = false;
     public List<MessageContent> MessageHistory { get; set; } = [];
+
     public string SystemPrompt
     {
         set
@@ -56,11 +57,13 @@ public class NativeChatClient : INativeChatClient
         HttpClient = new SseHttpClient();
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
     }
-    public void ClearHistory()
+    public void ResetHistory(string continuation = null)
     {
-        var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System);
-        if (systemMessage is not null) MessageHistory = [systemMessage];
+        var systemPrompt = SystemPrompt;
+        if (systemPrompt is not null) MessageHistory = [MessageContent.Create(Role.System, SystemPrompt)];
         else MessageHistory.Clear();
+
+        if (!continuation.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.User, continuation));
     }
 
 

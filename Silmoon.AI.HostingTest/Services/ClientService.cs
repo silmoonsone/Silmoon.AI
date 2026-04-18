@@ -1,7 +1,7 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Client.OpenAI;
-using Silmoon.AI.Client.Prompts;
+using Silmoon.AI.Prompts;
 using Silmoon.AI.Tools;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Models;
@@ -25,6 +25,9 @@ public class ClientService : IHostedService
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.ApiUrl, SilmoonConfigureService.Key, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
         NativeChatClient.OnToolCallInvoke += NativeChatClient_OnToolCallInvoke;
         NativeChatClient.OnToolCallFinished += NativeChatClient_OnToolCallFinished;
+        NativeChatClient.Tools.AddRange(makeTools());
+        // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool
+        new ContinuationMemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
         //NativeChatClient.EnableThinking = true;
     }
 
@@ -102,7 +105,7 @@ public class ClientService : IHostedService
                     switch (command)
                     {
                         case "clear":
-                            NativeChatClient.ClearHistory();
+                            NativeChatClient.ResetHistory();
                             Console.WriteLine("Message history cleared.");
                             break;
                         case "exit":
@@ -121,7 +124,7 @@ public class ClientService : IHostedService
                     if (stream)
                     {
                         List<Chunk> chunks = [];
-                        await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(input, chunks, [.. makeTools()]))
+                        await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(input, chunks))
                         {
                             if (chunk.State)
                             {

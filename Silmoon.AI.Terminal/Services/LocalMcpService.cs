@@ -24,6 +24,7 @@ namespace Silmoon.AI.Terminal.Services
         public void InjectMcp(NativeChatClient nativeChatClient)
         {
             ExecuteTools.Add(new DeepThinkTool(nativeChatClient));
+            ExecuteTools.Add(new ContinuationMemoryTool(nativeChatClient));
 
             string systemPrompt = SilmoonConfigureService.SystemPrompt;
             if (systemPrompt is not null) nativeChatClient.SystemPrompt += "\r\n" + systemPrompt;

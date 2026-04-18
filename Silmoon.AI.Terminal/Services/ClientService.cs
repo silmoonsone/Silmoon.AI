@@ -1,7 +1,7 @@
-using Microsoft.Extensions.Hosting;
+﻿using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Client.OpenAI;
-using Silmoon.AI.Client.Prompts;
+using Silmoon.AI.Prompts;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
@@ -70,7 +70,7 @@ public class ClientService : IHostedService
                     switch (command)
                     {
                         case "clear":
-                            NativeChatClient.ClearHistory();
+                            NativeChatClient.ResetHistory();
                             Console.WriteLine("Message history cleared.");
                             break;
                         case "exit":
