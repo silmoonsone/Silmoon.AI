@@ -14,6 +14,7 @@ namespace Silmoon.AI.Terminal.Services
         public List<IExecuteTool> ExecuteTools { get; set; } = [
             new FileTool(),
             new CommandTool(),
+            new WaitTool(),
             ];
         SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
         public LocalMcpService(ISilmoonConfigureService silmoonConfigureService)

@@ -95,6 +95,7 @@ namespace Silmoon.AI.WinFormTest
                 ]),
                 .. FileTool.GetTools(),
                 .. CommandTool.GetTools(),
+                .. WaitTool.GetTools(),
             ];
         }
 

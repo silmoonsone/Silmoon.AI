@@ -73,6 +73,7 @@ public class ClientService : IHostedService
             ]),
             .. FileTool.GetTools(),
             .. CommandTool.GetTools(),
+            .. WaitTool.GetTools(),
         ];
     }
 
