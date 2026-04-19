@@ -45,7 +45,7 @@ public class ClientService : IHostedService
         switch (functionName)
         {
             case "ToolCallTestTool":
-                return true.ToStateSet(MessageContent.Create(Role.Tool, $"这是一个工具调用环境测试，正常！"));
+                return true.ToStateSet(MessageContent.Create(Role.Tool, $"这是一个工具调用环境测试，正常！", toolCallId));
             default:
                 return null;
         }
