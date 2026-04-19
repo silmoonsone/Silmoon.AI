@@ -15,6 +15,15 @@ public class SseHttpClient : HttpClient
         NullValueHandling = NullValueHandling.Ignore,
         MissingMemberHandling = MissingMemberHandling.Ignore,
     };
+
+    public SseHttpClient() : base(new HttpClientHandler { UseProxy = false, Proxy = null })
+    {
+
+    }
+    public SseHttpClient(HttpClientHandler httpClientHandler) : base(httpClientHandler)
+    {
+
+    }
     public async Task<StateSet<bool, Response>> CompletionsAsync(string url, Request request)
     {
         try
