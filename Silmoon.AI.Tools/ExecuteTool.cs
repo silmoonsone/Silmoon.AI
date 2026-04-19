@@ -11,8 +11,13 @@ namespace Silmoon.AI.Tools
 {
     public abstract class ExecuteTool : IExecuteTool
     {
-        public Tool[] Tools { get; internal set; } = [];
+        public Tool[] Tools { get; set; } = [];
 
+        protected ExecuteTool()
+        {
+            Tools = GetTools();
+        }
+        public abstract Tool[] GetTools();
         public virtual void InjectToolCall(INativeChatClient nativeChatClient)
         {
             nativeChatClient.Tools.AddRange(Tools);

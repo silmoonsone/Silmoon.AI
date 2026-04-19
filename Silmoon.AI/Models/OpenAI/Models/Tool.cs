@@ -22,8 +22,8 @@ public class Tool
                 Parameters = new ToolParameters()
                 {
                     Type = "object",
-                    Properties = new Dictionary<string, ToolParameterProperty>(),
-                    Required = new List<string>(),
+                    Properties = [],
+                    Required = [],
                     AdditionalProperties = false
                 }
             }

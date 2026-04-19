@@ -16,10 +16,8 @@ namespace Silmoon.AI.Tools
         public DeepThinkTool(INativeChatClient nativeChatClient)
         {
             NativeChatClient = nativeChatClient;
-
-            Tools = GetTools();
         }
-        public Tool[] GetTools()
+        public override Tool[] GetTools()
         {
             return [Tool.Create("ask", """
                 Delegate a **hard** task to the stronger model (same client stack); returns its reply. **Use:** hard reasoning, review, security, design, long analysis. **Skip:** trivial Q&A the main model handles (cost/latency).

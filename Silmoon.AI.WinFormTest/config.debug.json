@@ -1,8 +1,5 @@
 ﻿{
-  "mongodb": "mongodb://user:pwd@mongodb0.mongodbserver.host/dbname",
-  
-  "aiKey": "sk-?",
-  
-  "aiApiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
-  "aiModelName": "qwen-plus"
+  "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "apiKey": "sk-***",
+  "modelName": "qwen-plus"
 }

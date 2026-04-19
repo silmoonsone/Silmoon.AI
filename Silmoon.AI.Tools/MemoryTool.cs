@@ -73,10 +73,9 @@ public class MemoryTool : ExecuteTool
     public MemoryTool(INativeChatClient nativeChatClient)
     {
         NativeChatClient = nativeChatClient;
-        Tools = GetTools();
     }
 
-    public static Tool[] GetTools()
+    public override Tool[] GetTools()
     {
         return
         [

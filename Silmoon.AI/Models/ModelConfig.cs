@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using System.Text;
 
-namespace Silmoon.AI.Configures
+namespace Silmoon.AI.Models
 {
     public class ModelConfig
     {
@@ -13,5 +13,7 @@ namespace Silmoon.AI.Configures
         public string ApiKey { get; set; }
         [JsonProperty("modelName")]
         public string ModelName { get; set; }
+        [JsonProperty("enable")]
+        public bool Enable { get; set; } = true;
     }
 }

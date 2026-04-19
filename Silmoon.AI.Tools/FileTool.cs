@@ -13,9 +13,8 @@ namespace Silmoon.AI.Tools
 {
     public class FileTool : ExecuteTool
     {
-        public FileTool() => Tools = GetTools();
         public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState) => await CallTool(functionName, parameters, toolCallId);
-        public static Tool[] GetTools()
+        public override Tool[] GetTools()
         {
             return [
                 Tool.Create("FileTool", """

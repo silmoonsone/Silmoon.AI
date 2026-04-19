@@ -18,9 +18,8 @@ public class WaitTool : ExecuteTool
     /// <summary>单次等待上限（5 分钟），防止误填过大值长时间阻塞。</summary>
     public const int MaxDurationMs = 300_000;
 
-    public WaitTool() => Tools = GetTools();
 
-    public static Tool[] GetTools()
+    public override Tool[] GetTools()
     {
         return [
             Tool.Create("WaitTool", """
@@ -39,12 +38,10 @@ public class WaitTool : ExecuteTool
 
     public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState)
     {
-        if (functionName != "WaitTool")
-            return null;
+        if (functionName != "WaitTool") return null;
 
         var token = parameters["durationMilliseconds"];
-        if (token is null || token.Type == JTokenType.Null)
-            return false.ToStateSet<MessageContent>(null, "durationMilliseconds is required.");
+        if (token is null || token.Type == JTokenType.Null) return false.ToStateSet<MessageContent>(null, "durationMilliseconds is required.");
 
         int ms;
         try

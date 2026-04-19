@@ -11,6 +11,7 @@ namespace Silmoon.AI.Interfaces
     public interface IExecuteTool
     {
         Tool[] Tools { get; }
+        Tool[] GetTools();
         void InjectToolCall(INativeChatClient nativeChatClient);
         Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState);
     }

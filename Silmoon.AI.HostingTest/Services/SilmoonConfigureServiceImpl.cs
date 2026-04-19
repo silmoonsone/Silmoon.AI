@@ -24,9 +24,9 @@ namespace Silmoon.AI.HostingTest.Services
             Logger = logger;
             Logger.LogInformation($"当前配置文件{CurrentConfigFilePath}");
 
-            ApiUrl = ConfigJson["ApiUrl"]?.Value<string>();
-            Key = ConfigJson["Key"]?.Value<string>();
-            ModelName = ConfigJson["ModelName"]?.Value<string>();
+            ApiUrl = ConfigJson["apiUrl"]?.Value<string>();
+            Key = ConfigJson["apiKey"]?.Value<string>();
+            ModelName = ConfigJson["modelName"]?.Value<string>();
 
             string defaultPrompt = """
             你是一个AI助手，旨在帮助用户解决问题和提供信息。请确保你的回答准确、简洁，并且易于理解。你可以回答各种问题，包括但不限于技术支持、常识性问题、编程帮助等。请保持专业和友好的语气。

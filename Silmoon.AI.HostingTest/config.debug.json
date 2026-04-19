@@ -1,6 +1,5 @@
 ﻿{
-  "apiKey": "sk-?",
-
   "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "apiKey": "sk-***",
   "modelName": "qwen-plus"
 }

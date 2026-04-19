@@ -26,6 +26,9 @@ public class ClientService : IHostedService
         NativeChatClient.OnToolCallInvoke += NativeChatClient_OnToolCallInvoke;
         NativeChatClient.OnToolCallFinished += NativeChatClient_OnToolCallFinished;
         NativeChatClient.Tools.AddRange(makeTools());
+        new FileTool().InjectToolCall(NativeChatClient);
+        new CommandTool().InjectToolCall(NativeChatClient);
+        new WaitTool().InjectToolCall(NativeChatClient);
         // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool
         new MemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
         //NativeChatClient.EnableThinking = true;
@@ -41,7 +44,7 @@ public class ClientService : IHostedService
     {
         Console.WriteLine();
         Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
-        StateSet<bool, MessageContent> result;
+        StateSet<bool, MessageContent> result = null;
 
         switch (functionName)
         {
@@ -52,12 +55,7 @@ public class ClientService : IHostedService
             case "TradingController":
                 result = false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
                 break;
-            case "FileTool":
-                var fileSystemResult = FileTool.CallTool(functionName, parameters, toolCallId);
-                result = true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
-                break;
             default:
-                result = await CommandTool.CallTool(functionName, parameters, toolCallId);
                 break;
         }
         return result;
@@ -74,9 +72,6 @@ public class ClientService : IHostedService
             [
                 new ToolParameterProperty("string", "action", "The action to perform on the trading client.", ["start", "stop", "pause", "resume"], true),
             ]),
-            .. FileTool.GetTools(),
-            .. CommandTool.GetTools(),
-            .. WaitTool.GetTools(),
         ];
     }
 
