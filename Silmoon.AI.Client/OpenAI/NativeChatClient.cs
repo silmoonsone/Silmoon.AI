@@ -85,10 +85,11 @@ public class NativeChatClient : INativeChatClient
     public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         chunks ??= [];
+        model ??= Model;
         while (true)
         {
-            var request = new Request(model ?? Model, [.. messageHistory]);
-            request.SetEnableThinking(EnableThinking);
+            var request = new Request(model, [.. messageHistory]);
+            request.SetEnableThinking(EnableThinking, ApiUrl, model);
             request.EnableSearch = EnableSearch;
             request.Tools = tools ?? Tools;
 
@@ -163,7 +164,7 @@ public class NativeChatClient : INativeChatClient
         while (true)
         {
             Request request = new Request(model, [.. messageHistory]);
-            request.SetEnableThinking(EnableThinking);
+            request.SetEnableThinking(EnableThinking, ApiUrl, model);
             request.EnableSearch = EnableSearch;
             request.Tools = tools ?? Tools;
 

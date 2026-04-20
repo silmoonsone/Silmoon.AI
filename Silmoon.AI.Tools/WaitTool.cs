@@ -23,16 +23,16 @@ public class WaitTool : ExecuteTool
     {
         return [
             Tool.Create("WaitTool", """
-                **Purpose:** Pause for a fixed **wall-clock** duration, then return. Use to **space retries**, slow loops, or pause before a follow-up check. **Not** for shell/output waits → **StatefulCommand***.
+            **Purpose:** Pause for a fixed **wall-clock** duration, then return. Use to **space retries**, slow loops, or pause before a follow-up check. **Not** for shell/output waits → **StatefulCommand***.
 
-                **User-visible transparency (mandatory):** In the **same turn** as this call, your message to the human **must** state **how long** you will wait: give **`durationMilliseconds`** and **seconds** (e.g. `durationMilliseconds=5000` → 5s). **Forbidden:** only vague text (“等一下”“稍后再测”) **without** the numeric duration. Prefer **asking the user** to confirm the wait when it is not obvious; if they already chose a duration, **repeat** it when calling.
+            **User-visible transparency (mandatory):** In the **same turn** as this call, your message to the human **must** state **how long** you will wait: give **`durationMilliseconds`** and **seconds** (e.g. `durationMilliseconds=5000` → 5s). **Forbidden:** only vague text (“等一下”“稍后再测”) **without** the numeric duration. Prefer **asking the user** to confirm the wait when it is not obvious; if they already chose a duration, **repeat** it when calling.
 
-                **Limits:** Clamped server-side to **100 ms–300 s** (5 min).
-                """,
-                [
-                    new ToolParameterProperty("integer", "durationMilliseconds", $"Ms to wait (clamped {MinDurationMs}–{MaxDurationMs}). **Same turn:** tell the user this value + seconds before/around the call.", null, true),
-                    new ToolParameterProperty("string", "reason", "Optional; can mirror why you wait (still state duration in user text).", null, false),
-                ]),
+            **Limits:** Clamped server-side to **100 ms–300 s** (5 min).
+            """,
+            [
+                new ToolParameterProperty("integer", "durationMilliseconds", $"Ms to wait (clamped {MinDurationMs}–{MaxDurationMs}). **Same turn:** tell the user this value + seconds before/around the call.", null, true),
+                new ToolParameterProperty("string", "reason", "Optional; can mirror why you wait (still state duration in user text).", null, false),
+            ]),
         ];
     }
 

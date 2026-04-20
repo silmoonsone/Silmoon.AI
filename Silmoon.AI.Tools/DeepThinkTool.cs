@@ -19,14 +19,17 @@ namespace Silmoon.AI.Tools
         }
         public override Tool[] GetTools()
         {
-            return [Tool.Create("ask", """
+            return [
+                Tool.Create("ask", """
                 Delegate a **hard** task to the stronger model (same client stack); returns its reply. **Use:** hard reasoning, review, security, design, long analysis. **Skip:** trivial Q&A the main model handles (cost/latency).
 
                 Empty `system` = don’t override delegation prompt; if set, overrides system for this call only (host behavior).
-                """, [
-                new ToolParameterProperty("string", "content", "Task: goal, constraints, input, desired output shape."),
-                new ToolParameterProperty("string", "system", "Optional. Role, format, language. Omit to keep default.")
-                ])];
+                """,
+                [
+                    new ToolParameterProperty("string", "content", "Task: goal, constraints, input, desired output shape."),
+                    new ToolParameterProperty("string", "system", "Optional. Role, format, language. Omit to keep default.")
+                ]),
+            ];
         }
         public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState)
         {

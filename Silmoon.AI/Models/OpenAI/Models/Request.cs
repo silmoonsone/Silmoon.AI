@@ -28,18 +28,21 @@ public class Request
 
     public bool ShouldSerializeTools() => Tools != null && Tools.Count > 0;
 
-    public void SetEnableThinking(bool enableThinking)
+    public void SetEnableThinking(bool enableThinking, string apiUrl, string modelName)
     {
+        apiUrl = apiUrl.ToLower();
+        modelName = modelName.ToLower();
         if (enableThinking)
         {
             EnableThinking = true;
             ReasoningEffort = "high";
-            ReasoningEffort = null;
         }
         else
         {
             EnableThinking = false;
             ReasoningEffort = "none";
+
+            if (apiUrl.Contains("deepseek")) ReasoningEffort = null;
         }
     }
 

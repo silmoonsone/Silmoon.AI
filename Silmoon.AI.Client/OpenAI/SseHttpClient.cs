@@ -24,6 +24,7 @@ public class SseHttpClient : HttpClient
     {
 
     }
+
     public async Task<StateSet<bool, Response>> CompletionsAsync(string url, Request request)
     {
         try
@@ -58,7 +59,6 @@ public class SseHttpClient : HttpClient
             return false.ToStateSet<Response>(null, $"Exception during HTTP request: {ex.Message}");
         }
     }
-
     public async Task<StateSet<bool, Chunk[]>> CompletionsStreamAsync(string url, Request request, Func<StateSet<bool, Chunk>, Task> callback)
     {
         try
