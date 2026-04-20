@@ -23,8 +23,10 @@ public class Request
     public string? ReasoningEffort { get; set; }
     [JsonProperty("enable_search")]
     public bool EnableSearch { get; set; }
-    [JsonProperty("tools")]
+    [JsonProperty("tools", NullValueHandling = NullValueHandling.Ignore)]
     public List<Tool> Tools { get; set; }
+
+    public bool ShouldSerializeTools() => Tools != null && Tools.Count > 0;
 
     public void SetEnableThinking(bool enableThinking)
     {
