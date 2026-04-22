@@ -1,6 +1,7 @@
 using System;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.Extensions;
+using Newtonsoft.Json;
 
 namespace Silmoon.AI.Models.OpenAI.Models;
 
@@ -8,9 +9,11 @@ public class Result
 {
     public Role Role { get; set; }
     public string Content { get; set; }
+    [JsonProperty(NullValueHandling = NullValueHandling.Ignore)]
+    public string ReasoningContent { get; set; }
     public string FinishReason { get; set; }
     public List<ToolCall> ToolCalls { get; set; } = [];
-    public static Result Create(ChunkChoice[] chunkChoices)
+    public static Result Create(ChunkChoice[] chunkChoices, bool includeReasonContent = false)
     {
         Result result = new Result();
         Dictionary<int, ToolCall> toolCallsByIndex = [];
@@ -21,6 +24,13 @@ public class Result
                 if (choice.Delta is not null)
                 {
                     if (choice.Delta.Content is not null) result.Content += choice.Delta.Content;
+
+                    if (includeReasonContent)
+                    {
+                        if (choice.Delta.ReasoningContent is not null) result.ReasoningContent += choice.Delta.ReasoningContent;
+                        else if (choice.Delta.Reasoning is not null) result.ReasoningContent += choice.Delta.Reasoning;
+                    }
+
                     if (choice.Delta.Role is not null) result.Role = choice.Delta.Role.Value;
                     if (!choice.FinishReason.IsNullOrEmpty()) result.FinishReason = choice.FinishReason;
                     AccumulateToolCallFragments(toolCallsByIndex, choice);
@@ -30,7 +40,7 @@ public class Result
         AssignOrderedToolCalls(result, toolCallsByIndex);
         return result;
     }
-    public static Result Create(Chunk[] responses)
+    public static Result Create(Chunk[] responses, bool includeReasonContent = false)
     {
         List<ChunkChoice> chunkChoices = [];
         foreach (var response in responses)
@@ -38,7 +48,7 @@ public class Result
             if (!response.Choices.IsNullOrEmpty()) chunkChoices.AddRange(response.Choices);
         }
 
-        return Create([.. chunkChoices]);
+        return Create([.. chunkChoices], includeReasonContent);
     }
 
 

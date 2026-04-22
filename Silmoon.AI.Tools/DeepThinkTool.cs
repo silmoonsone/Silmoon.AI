@@ -26,8 +26,9 @@ namespace Silmoon.AI.Tools
                 Empty `system` = don’t override delegation prompt; if set, overrides system for this call only (host behavior).
                 """,
                 [
+                    new ToolParameterProperty("string", "system", "Optional. Role, format, language. Omit to keep default."),
                     new ToolParameterProperty("string", "content", "Task: goal, constraints, input, desired output shape."),
-                    new ToolParameterProperty("string", "system", "Optional. Role, format, language. Omit to keep default.")
+                    //new ToolParameterProperty("bool", "reasonContent", "Enable thinking and reasoning, default is false.", [true, false]),
                 ]),
             ];
         }
@@ -35,8 +36,9 @@ namespace Silmoon.AI.Tools
         {
             if (functionName == "ask")
             {
-                string content = parameters["content"].ToString();
                 string system = parameters["system"]?.ToString();
+                string content = parameters["content"].ToString();
+                //bool reasonContent = parameters["reasonContent"]?.Value<bool>() ?? false;
 
                 if (system is not null) NativeChatClient.SystemPrompt = system;
 
