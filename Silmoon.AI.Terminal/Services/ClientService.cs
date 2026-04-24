@@ -24,7 +24,7 @@ public class ClientService : IHostedService
         ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
 
-        NativeChatClient = new NativeChatClient(SilmoonConfigureService.ApiUrl, SilmoonConfigureService.Key, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
+        NativeChatClient = new NativeChatClient(SilmoonConfigureService.ApiUrl, SilmoonConfigureService.Key, SilmoonConfigureService.DefaultModelName, UtilPrompt.ContextPrompt);
         NativeChatClient.OnToolCallInvoke += NativeChatClient_OnToolCallInvoke;
         NativeChatClient.OnToolCallFinished += NativeChatClient_OnToolCallFinished;
         LocalMcpService.InjectMcp(NativeChatClient);

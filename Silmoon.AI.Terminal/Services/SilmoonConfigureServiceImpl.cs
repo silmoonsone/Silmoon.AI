@@ -16,9 +16,10 @@ namespace Silmoon.AI.Terminal.Services
     {
         public string ApiUrl { get; set; }
         public string Key { get; set; }
-        public string ModelName { get; set; }
+        public ModelProviders DefaultProvider { get; set; }
+        public string DefaultModelName { get; set; }
 
-        public Dictionary<string, ModelConfig> Models { get; set; } = [];
+        public Dictionary<string, ModelProviders> Models { get; set; } = [];
         public string SystemPrompt { get; set; }
         ILogger<ISilmoonConfigureService> Logger { get; set; }
 
@@ -28,20 +29,18 @@ namespace Silmoon.AI.Terminal.Services
             Logger.LogInformation($"当前配置文件{CurrentConfigFilePath}");
 
             SystemPrompt = ConfigJson.GetValue("systemPrompt")?.Value<string>();
-            var modelObj = ConfigJson["models"];
+            var modelObj = ConfigJson["modelProviders"];
             foreach (JProperty item in modelObj)
             {
-                Models.Add(item.Name, item.Value.ToObject<ModelConfig>());
+                Models.Add(item.Name, item.Value.ToObject<ModelProviders>());
             }
 
+            DefaultProvider = Models[ConfigJson["defaultModel"]["defaultProvider"].Value<string>()];
+            DefaultModelName = ConfigJson["defaultModel"]["defaultModelName"].Value<string>();
+            ApiUrl = DefaultProvider.ApiUrl;
+            Key = DefaultProvider.ApiKey;
 
-
-            var defaultModelName = ConfigJson["defaultModel"]?.Value<string>();
-
-            ApiUrl = Models[defaultModelName].ApiUrl;
-            Key = Models[defaultModelName].ApiKey;
-            ModelName = Models[defaultModelName].ModelName;
-            logger.LogInformation($"Model: {ModelName}, ApiUrl: {ApiUrl}");
+            logger.LogInformation($"Model: {DefaultModelName}, ApiUrl: {ApiUrl}");
         }
     }
 }

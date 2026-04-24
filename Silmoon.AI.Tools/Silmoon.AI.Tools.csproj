@@ -7,7 +7,6 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <PackageReference Include="Microsoft.CodeAnalysis.CSharp.Scripting" Version="5.3.0" />
     <PackageReference Include="Silmoon" Version="3.0.2" />
     <PackageReference Include="Silmoon.Extensions" Version="3.0.0" />
   </ItemGroup>
