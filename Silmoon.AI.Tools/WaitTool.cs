@@ -36,12 +36,12 @@ public class WaitTool : ExecuteTool
         ];
     }
 
-    public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState)
+    public override async Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
     {
         if (functionName != "WaitTool") return null;
 
         var token = parameters["durationMilliseconds"];
-        if (token is null || token.Type == JTokenType.Null) return false.ToStateSet<MessageContent>(null, "durationMilliseconds is required.");
+        if (token is null || token.Type == JTokenType.Null) return false.ToStateSet<string>(null, "durationMilliseconds is required.");
 
         int ms;
         try
@@ -50,7 +50,7 @@ public class WaitTool : ExecuteTool
         }
         catch
         {
-            return false.ToStateSet<MessageContent>(null, "durationMilliseconds must be a number.");
+            return false.ToStateSet<string>(null, "durationMilliseconds must be a number.");
         }
 
         if (ms < MinDurationMs) ms = MinDurationMs;
@@ -64,6 +64,6 @@ public class WaitTool : ExecuteTool
             waitedMilliseconds = ms,
             reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
         });
-        return true.ToStateSet(MessageContent.Create(Role.Tool, payload, toolCallId));
+        return true.ToStateSet<string>(payload);
     }
 }

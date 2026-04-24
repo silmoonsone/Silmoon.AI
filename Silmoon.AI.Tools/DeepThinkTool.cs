@@ -32,7 +32,7 @@ namespace Silmoon.AI.Tools
                 ]),
             ];
         }
-        public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState)
+        public override async Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
         {
             if (functionName == "ask")
             {
@@ -64,7 +64,7 @@ namespace Silmoon.AI.Tools
                 Console.WriteLineWithColor("Agent response end:", ConsoleColor.Green, ConsoleColor.Blue);
                 var result = Result.Create([.. chunks]);
 
-                return true.ToStateSet(MessageContent.Create(Role.Tool, result.ToJsonString(), toolCallId));
+                return true.ToStateSet<string>(result.ToJsonString());
             }
             else
                 return null;

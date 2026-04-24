@@ -24,6 +24,6 @@ namespace Silmoon.AI.Tools
             nativeChatClient.OnToolCallInvoke += OnToolCallInvoke;
         }
 
-        public abstract Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState);
+        public abstract Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState);
     }
 }

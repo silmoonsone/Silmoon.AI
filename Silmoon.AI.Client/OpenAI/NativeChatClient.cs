@@ -14,7 +14,7 @@ namespace Silmoon.AI.Client.OpenAI;
 public class NativeChatClient : INativeChatClient
 {
     public event ToolCallInvokeHandler OnToolCallInvoke;
-    public event Func<StateSet<bool, MessageContent>, Task<StateSet<bool, MessageContent>>> OnToolCallFinished;
+    public event Func<StateSet<bool, string>, Task<StateSet<bool, string>>> OnToolCallFinished;
     public string ApiUrl { get; set; }
     public string ApiKey { get; set; }
     public string Model { get; set; }
@@ -137,11 +137,11 @@ public class NativeChatClient : INativeChatClient
                         string functionName = result.ToolCalls[0].Function.Name;
                         JObject parameters = result.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ? [] : JsonConvert.DeserializeObject<JObject>(result.ToolCalls[0].Function.Arguments);
                         var toolCallResult = await ToolCall(functionName, parameters, result.ToolCalls[0].Id);
-                        if (toolCallResult.State)
+
+                        if (functionName != MemoryTool.ApplyMemoryToolFunctionName || !toolCallResult.State)
                         {
-                            if (functionName != MemoryTool.ApplyFunctionName) messageHistory.Add(toolCallResult.Data);
+                            messageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), result.ToolCalls[0].Id));
                         }
-                        else messageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), result.ToolCalls[0].Id));
                         continue;
                     }
                     else break;
@@ -184,11 +184,11 @@ public class NativeChatClient : INativeChatClient
                     string functionName = firstChoice?.Message?.ToolCalls[0].Function.Name;
                     JObject parameters = firstChoice?.Message?.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ?? false ? [] : JsonConvert.DeserializeObject<JObject>(firstChoice?.Message?.ToolCalls[0].Function.Arguments);
                     var toolCallResult = await ToolCall(functionName, parameters, firstChoice?.Message?.ToolCalls[0].Id);
-                    if (toolCallResult.State)
+
+                    if (functionName != MemoryTool.ApplyMemoryToolFunctionName || !toolCallResult.State)
                     {
-                        if (functionName != MemoryTool.ApplyFunctionName) messageHistory.Add(toolCallResult.Data);
+                        messageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id));
                     }
-                    else messageHistory.Add(MessageContent.Create(Role.Tool, false.ToStateSet(toolCallResult.Message).ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id));
                     continue;
                 }
                 return response.Data;
@@ -196,23 +196,23 @@ public class NativeChatClient : INativeChatClient
         }
     }
 
-    async Task<StateSet<bool, MessageContent>> ToolCall(string functionName, JObject parameters, string toolCallId)
+    async Task<StateSet<bool, string>> ToolCall(string functionName, JObject parameters, string toolCallId)
     {
         try
         {
-            StateSet<bool, MessageContent> result = null;
+            StateSet<bool, string> result = null;
             foreach (ToolCallInvokeHandler handler in OnToolCallInvoke.GetInvocationList().Cast<ToolCallInvokeHandler>())
             {
                 var tmpResult = await handler(functionName, parameters, toolCallId, result);
                 if (tmpResult is not null) result = tmpResult;
             }
-            result ??= false.ToStateSet<MessageContent>(null, $"function {functionName} not implemented.");
+            result ??= false.ToStateSet<string>(null, $"function {functionName} not implemented.");
             result = await (OnToolCallFinished?.Invoke(result) ?? Task.FromResult(result));
             return result;
         }
         catch (Exception ex)
         {
-            return false.ToStateSet<MessageContent>(null, $"执行函数 {functionName} 时发生异常: {ex.Message}");
+            return false.ToStateSet<string>(null, $"执行函数 {functionName} 时发生异常: {ex.Message}");
         }
     }
 

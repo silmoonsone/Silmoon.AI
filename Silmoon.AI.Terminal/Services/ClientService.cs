@@ -32,20 +32,20 @@ public class ClientService : IHostedService
         //NativeChatClient.EnableThinking = true;
     }
 
-    private Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallFinished(StateSet<bool, MessageContent> arg)
+    private Task<StateSet<bool, string>> NativeChatClient_OnToolCallFinished(StateSet<bool, string> arg)
     {
         if (arg.State) Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message ?? "#null"}", ConsoleColor.Cyan);
         else Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message ?? "#null"}", ConsoleColor.Red);
         return Task.FromResult(arg);
     }
-    private async Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState)
+    private async Task<StateSet<bool, string>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
     {
         Console.WriteLine();
         Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
         switch (functionName)
         {
             case "ToolCallTestTool":
-                return true.ToStateSet(MessageContent.Create(Role.Tool, $"这是一个工具调用环境测试，正常！", toolCallId));
+                return true.ToStateSet<string>($"这是一个工具调用环境测试，正常！");
             default:
                 return null;
         }

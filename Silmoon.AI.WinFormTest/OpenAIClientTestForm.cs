@@ -45,26 +45,26 @@ namespace Silmoon.AI.WinFormTest
             // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool 对未知函数名的结果
             new MemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
         }
-        private Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallFinished(StateSet<bool, MessageContent> arg)
+        private Task<StateSet<bool, string>> NativeChatClient_OnToolCallFinished(StateSet<bool, string> arg)
         {
             if (arg.State) Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Cyan);
             else Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Red);
             return Task.FromResult(arg);
         }
-        private async Task<StateSet<bool, MessageContent>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState)
+        private async Task<StateSet<bool, string>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
         {
             Console.WriteLine();
             Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
-            StateSet<bool, MessageContent> result = null;
+            StateSet<bool, string> result = null;
 
             switch (functionName)
             {
                 case "QuoteTool":
-                    if (parameters["symbol"].Value<string>() == "XAUUSD") result = true.ToStateSet(MessageContent.Create(Role.Tool, StateSet<bool, decimal>.Create(true, 4800m).ToJsonString(), toolCallId));
-                    else result = false.ToStateSet<MessageContent>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，我们接受的应该是国际通用的产品符号，并且没有斜杠分割（/），如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
+                    if (parameters["symbol"].Value<string>() == "XAUUSD") result = true.ToStateSet<string>(4800m.ToJsonString());
+                    else result = false.ToStateSet<string>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，我们接受的应该是国际通用的产品符号，并且没有斜杠分割（/），如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。");
                     break;
                 case "TradingController":
-                    result = false.ToStateSet<MessageContent>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
+                    result = false.ToStateSet<string>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。");
                     break;
                 default:
                     break;

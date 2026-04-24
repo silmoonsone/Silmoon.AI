@@ -7,5 +7,5 @@ using System.Text;
 
 namespace Silmoon.AI.Handlers
 {
-    public delegate Task<StateSet<bool, MessageContent>> ToolCallInvokeHandler(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState);
+    public delegate Task<StateSet<bool, string>> ToolCallInvokeHandler(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState);
 }

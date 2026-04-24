@@ -1,14 +1,23 @@
 ﻿{
-  "defaultModel": "qwen3.6-plus",
+  "defaultModel": {
+    "defaultProvider": "aliyun",
+    "defaultModelName": "qwen3-max"
+  },
   "systemPrompt": "你是一个终端或者命令行助手，根据用户的信息和请求执行响应的命令，自行根据上下文判断操作系统应该使用什么终端应用，并且需要自行判断操作系统的换行符和路径分隔符，你要注意你当前运行在终端，不要输出markdown格式的信息和表情。",
+
   "tools": [],
 
-  "models": {
-    "qwen3.6-plus": {
+  "modelProviders": [
+    {
+      "providerName": "aliyun",
       "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "apiKey": "sk-***",
-      "modelName": "qwen3.6-plus",
-      "enable": true
+      "models": [
+        {
+          "name": "qwen3.6-plus",
+          "enable": true
+        }
+      ]
     }
-  }
+  ]
 }

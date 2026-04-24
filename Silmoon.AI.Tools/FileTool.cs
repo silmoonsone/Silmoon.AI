@@ -13,7 +13,7 @@ namespace Silmoon.AI.Tools
 {
     public class FileTool : ExecuteTool
     {
-        public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState) => await CallTool(functionName, parameters, toolCallId);
+        public override async Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState) => await CallTool(functionName, parameters, toolCallId);
         public override Tool[] GetTools()
         {
             return [
@@ -31,15 +31,15 @@ namespace Silmoon.AI.Tools
         }
 
 
-        public static Task<StateSet<bool, MessageContent>> CallTool(string functionName, JObject parameters, string toolCallId)
+        public static Task<StateSet<bool, string>> CallTool(string functionName, JObject parameters, string toolCallId)
         {
-            StateSet<bool, MessageContent> result = null;
+            StateSet<bool, string> result = null;
 
             switch (functionName)
             {
                 case "FileTool":
                     var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, fileSystemResult.ToJsonString(), toolCallId));
+                    result = true.ToStateSet<string>(fileSystemResult.ToJsonString());
                     break;
                 default:
                     break;
@@ -47,7 +47,7 @@ namespace Silmoon.AI.Tools
             return Task.FromResult(result);
         }
 
-        static StateSet<bool, object> ExecuteTool(string action, string path, string content)
+        static StateSet<bool, string> ExecuteTool(string action, string path, string content)
         {
             switch (action)
             {
@@ -58,22 +58,22 @@ namespace Silmoon.AI.Tools
                 //case "delete":
                 //    return DeleteFile(path);
                 default:
-                    return false.ToStateSet<object>(data: $"Unsupported action: {action}");
+                    return false.ToStateSet<string>(null, $"Unsupported action: {action}");
             }
         }
-        static StateSet<bool, object> WriteFile(string path, string content)
+        static StateSet<bool, string> WriteFile(string path, string content)
         {
             try
             {
                 File.WriteAllText(path, content);
-                return true.ToStateSet<object>(data: null);
+                return true.ToStateSet<string>(null);
             }
             catch (Exception e)
             {
-                return false.ToStateSet<object>(data: null, message: $"Error writing file: {e.Message}");
+                return false.ToStateSet<string>(null, message: $"Error writing file: {e.Message}");
             }
         }
-        static StateSet<bool, object> ReadFile(string path)
+        static StateSet<bool, string> ReadFile(string path)
         {
             try
             {
@@ -81,19 +81,19 @@ namespace Silmoon.AI.Tools
                 if (File.Exists(path))
                 {
                     string content = File.ReadAllText(path);
-                    return true.ToStateSet<object>(data: content);
+                    return true.ToStateSet<string>(content);
                 }
-                else return false.ToStateSet<object>(data: null, message: $"File not found: {path}");
+                else return false.ToStateSet<string>(null, message: $"File not found: {path}");
             }
             catch (Exception e)
             {
-                return false.ToStateSet<object>(data: null, message: $"Error reading file: {e.Message}");
+                return false.ToStateSet<string>(null, message: $"Error reading file: {e.Message}");
             }
         }
-        //public static StateSet<bool, object> DeleteFile(string path)
+        //public static StateSet<bool, string> DeleteFile(string path)
         //{
         //    File.Delete(path);
-        //    return true.ToStateSet<object>(data: null);
+        //    return true.ToStateSet<string>(null);
         //}
     }
 }

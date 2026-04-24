@@ -13,6 +13,6 @@ namespace Silmoon.AI.Interfaces
         Tool[] Tools { get; }
         Tool[] GetTools();
         void InjectToolCall(INativeChatClient nativeChatClient);
-        Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState);
+        Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState);
     }
 }

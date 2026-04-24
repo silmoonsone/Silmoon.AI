@@ -33,7 +33,7 @@ namespace Silmoon.AI.Tools
         static readonly ConcurrentDictionary<string, DateTimeOffset> SessionClosedIntentionallyAt = new();
         const double TombstoneRetentionHours = 168; // 7 天后遗忘，避免字典无限增长
 
-        public override async Task<StateSet<bool, MessageContent>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, MessageContent> toolMessageState) => await CallTool(functionName, parameters, toolCallId);
+        public override async Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState) => await CallTool(functionName, parameters, toolCallId);
 
 
         public override Tool[] GetTools()
@@ -109,9 +109,9 @@ namespace Silmoon.AI.Tools
         /// <summary>
         /// 分发 <see cref="GetTools"/> 中注册的 <c>CommandTool</c>（无状态）与 <c>StatefulCommandExecuteTool*</c>（有状态）工具；有状态实现对应 <c>ExecuteCommand</c> / <c>GetCommandOutput</c> / <c>GetShellSessionStatus</c> / <c>CloseCommand</c>。
         /// </summary>
-        public static Task<StateSet<bool, MessageContent>> CallTool(string functionName, JObject parameters, string toolCallId)
+        public static Task<StateSet<bool, string>> CallTool(string functionName, JObject parameters, string toolCallId)
         {
-            StateSet<bool, MessageContent> result = null;
+            StateSet<bool, string> result = null;
 
             switch (functionName)
             {
@@ -121,11 +121,11 @@ namespace Silmoon.AI.Tools
                         var osN = NormalizeOs(parameters["os"]?.Value<string>());
                         var ttN = NormalizeTerminal(parameters["terminalType"]?.Value<string>(), osN);
                         var outText = Execute(osN, parameters["command"]?.Value<string>() ?? string.Empty, ttN);
-                        result = true.ToStateSet(MessageContent.Create(Role.Tool, outText, toolCallId));
+                        result = true.ToStateSet<string>(outText);
                     }
                     catch (Exception ex)
                     {
-                        result = false.ToStateSet<MessageContent>(null, $"[CommandTool] {ex.Message}");
+                        result = false.ToStateSet<string>(null, $"[CommandTool] {ex.Message}");
                     }
                     break;
                 case "StatefulCommandExecuteTool":
@@ -137,7 +137,7 @@ namespace Silmoon.AI.Tools
                         parameters["command"]?.Value<string>() ?? string.Empty,
                         parameters["terminalType"]?.Value<string>() ?? string.Empty,
                         timeoutMs);
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, shellExecResult, toolCallId));
+                    result = true.ToStateSet<string>(shellExecResult);
                     break;
                 case "StatefulCommandGetOutputTool":
                     var waitOutToken = parameters["waitMilliseconds"];
@@ -145,14 +145,14 @@ namespace Silmoon.AI.Tools
                     if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
                     if (waitBeforeReadMs > 180_000) waitBeforeReadMs = 180_000;
                     var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, shellPollResult, toolCallId));
+                    result = true.ToStateSet<string>(shellPollResult);
                     break;
                 case "StatefulCommandGetSessionStatusTool":
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty), toolCallId));
+                    result = true.ToStateSet<string>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty));
                     break;
                 case "StatefulCommandCloseTool":
                     CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
-                    result = true.ToStateSet(MessageContent.Create(Role.Tool, "StatefulCommandCloseTool: session closed.", toolCallId));
+                    result = true.ToStateSet<string>("StatefulCommandCloseTool: session closed.");
                     break;
                 default:
                     break;
