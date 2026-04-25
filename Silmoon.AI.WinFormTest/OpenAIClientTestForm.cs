@@ -36,22 +36,22 @@ namespace Silmoon.AI.WinFormTest
             var systemPrompt = textBox1.Text;
             systemPrompt = MakeSystemPrompt();
             NativeChatClient = new NativeChatClient(ConfigureService.ConfigJson.Value<string>("apiUrl"), ConfigureService.ConfigJson.Value<string>("apiKey"), ConfigureService.ConfigJson.Value<string>("modelName"), systemPrompt);
-            NativeChatClient.OnToolCallInvoke += NativeChatClient_OnToolCallInvoke;
-            NativeChatClient.OnToolCallFinished += NativeChatClient_OnToolCallFinished;
+            NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
+            NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallCompleted;
             NativeChatClient.Tools.AddRange(makeTools());
             new FileTool().InjectToolCall(NativeChatClient);
             new CommandTool().InjectToolCall(NativeChatClient);
             new WaitTool().InjectToolCall(NativeChatClient);
-            // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool 对未知函数名的结果
+            // Inject 须在宿主 OnToolCallStart 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool 对未知函数名的结果
             new MemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
         }
-        private Task<StateSet<bool, string>> NativeChatClient_OnToolCallFinished(StateSet<bool, string> arg)
+        private Task<StateSet<bool, string>> NativeChatClient_OnToolCallCompleted(StateSet<bool, string> arg)
         {
             if (arg.State) Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Cyan);
             else Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Red);
             return Task.FromResult(arg);
         }
-        private async Task<StateSet<bool, string>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
+        private async Task<StateSet<bool, string>> NativeChatClient_OnToolCallStart(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
         {
             Console.WriteLine();
             Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);

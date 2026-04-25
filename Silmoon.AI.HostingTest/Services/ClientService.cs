@@ -23,8 +23,8 @@ public class ClientService : IHostedService
         ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.ApiUrl, SilmoonConfigureService.Key, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
-        NativeChatClient.OnToolCallInvoke += NativeChatClient_OnToolCallInvoke;
-        NativeChatClient.OnToolCallFinished += NativeChatClient_OnToolCallFinished;
+        NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
+        NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallCompleted;
         NativeChatClient.Tools.AddRange(makeTools());
         new FileTool().InjectToolCall(NativeChatClient);
         new CommandTool().InjectToolCall(NativeChatClient);
@@ -34,13 +34,13 @@ public class ClientService : IHostedService
         //NativeChatClient.EnableThinking = true;
     }
 
-    private Task<StateSet<bool, string>> NativeChatClient_OnToolCallFinished(StateSet<bool, string> arg)
+    private Task<StateSet<bool, string>> NativeChatClient_OnToolCallCompleted(StateSet<bool, string> arg)
     {
         if (arg.State) Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Cyan);
         else Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message}", ConsoleColor.Red);
         return Task.FromResult(arg);
     }
-    private async Task<StateSet<bool, string>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
+    private async Task<StateSet<bool, string>> NativeChatClient_OnToolCallStart(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
     {
         Console.WriteLine();
         Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);

@@ -21,7 +21,7 @@ namespace Silmoon.AI.Tools
         public virtual void InjectToolCall(INativeChatClient nativeChatClient)
         {
             nativeChatClient.Tools.AddRange(Tools);
-            nativeChatClient.OnToolCallInvoke += OnToolCallInvoke;
+            nativeChatClient.OnToolCallStart += OnToolCallInvoke;
         }
 
         public abstract Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState);

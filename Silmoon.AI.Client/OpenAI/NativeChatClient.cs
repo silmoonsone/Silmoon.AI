@@ -14,8 +14,8 @@ namespace Silmoon.AI.Client.OpenAI;
 
 public class NativeChatClient : INativeChatClient
 {
-    public event ToolCallInvokeHandler OnToolCallInvoke;
-    public event Func<StateSet<bool, string>, Task<StateSet<bool, string>>> OnToolCallFinished;
+    public event ToolCallStartHandler OnToolCallStart;
+    public event ToolCallCompletedHandler OnToolCallCompleted;
     public ModelProvider ModelProvider { get; set; }
     public string ModelName { get; set; }
     SseHttpClient HttpClient { get; set; }
@@ -208,13 +208,13 @@ public class NativeChatClient : INativeChatClient
         try
         {
             StateSet<bool, string> result = null;
-            foreach (ToolCallInvokeHandler handler in OnToolCallInvoke.GetInvocationList().Cast<ToolCallInvokeHandler>())
+            foreach (ToolCallStartHandler handler in OnToolCallStart.GetInvocationList().Cast<ToolCallStartHandler>())
             {
                 var tmpResult = await handler(functionName, parameters, toolCallId, result);
                 if (tmpResult is not null) result = tmpResult;
             }
             result ??= false.ToStateSet<string>(null, $"function {functionName} not implemented.");
-            result = await (OnToolCallFinished?.Invoke(result) ?? Task.FromResult(result));
+            result = await (OnToolCallCompleted?.Invoke(result) ?? Task.FromResult(result));
             return result;
         }
         catch (Exception ex)

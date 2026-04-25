@@ -25,8 +25,8 @@ public class ClientService : IHostedService
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
 
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.DefaultProvider, SilmoonConfigureService.DefaultModelName, UtilPrompt.ContextPrompt);
-        NativeChatClient.OnToolCallInvoke += NativeChatClient_OnToolCallInvoke;
-        NativeChatClient.OnToolCallFinished += NativeChatClient_OnToolCallFinished;
+        NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
+        NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallFinished;
         LocalMcpService.InjectMcp(NativeChatClient);
         NativeChatClient.Tools.Add(Tool.Create("ToolCallTestTool", "This is a test tool_calling test tool.", []));
         //NativeChatClient.EnableThinking = true;
@@ -38,7 +38,7 @@ public class ClientService : IHostedService
         else Console.WriteLineWithColor($"[TOOL RESULT] State: {arg.State}, Message: {arg.Message ?? "#null"}", ConsoleColor.Red);
         return Task.FromResult(arg);
     }
-    private async Task<StateSet<bool, string>> NativeChatClient_OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
+    private async Task<StateSet<bool, string>> NativeChatClient_OnToolCallStart(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
     {
         Console.WriteLine();
         Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
