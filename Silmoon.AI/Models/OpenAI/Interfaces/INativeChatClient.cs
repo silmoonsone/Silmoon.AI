@@ -8,9 +8,8 @@ namespace Silmoon.AI.Models.OpenAI.Interfaces;
 public interface INativeChatClient
 {
     event ToolCallInvokeHandler OnToolCallInvoke;
-    string ApiUrl { get; set; }
-    string ApiKey { get; set; }
-    string Model { get; set; }
+    ModelProvider ModelProvider { get; set; }
+    string ModelName { get; set; }
     string SystemPrompt { get; set; }
     List<Tool> Tools { get; set; }
     List<MessageContent> MessageHistory { get; set; }

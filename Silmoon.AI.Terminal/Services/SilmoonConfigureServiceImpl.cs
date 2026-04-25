@@ -14,12 +14,10 @@ namespace Silmoon.AI.Terminal.Services
 {
     public class SilmoonConfigureServiceImpl : SilmoonConfigureService
     {
-        public string ApiUrl { get; set; }
-        public string Key { get; set; }
-        public ModelProviders DefaultProvider { get; set; }
+        public ModelProvider DefaultProvider { get; set; }
         public string DefaultModelName { get; set; }
 
-        public Dictionary<string, ModelProviders> ModelProviders { get; set; } = [];
+        public Dictionary<string, ModelProvider> ModelProviders { get; set; } = [];
         public string SystemPrompt { get; set; }
         ILogger<ISilmoonConfigureService> Logger { get; set; }
 
@@ -32,16 +30,14 @@ namespace Silmoon.AI.Terminal.Services
             var modelObj = ConfigJson["modelProviders"];
             foreach (JObject item in modelObj)
             {
-                var modelProvider = item.ToObject<ModelProviders>();
+                var modelProvider = item.ToObject<ModelProvider>();
                 ModelProviders.Add(modelProvider.ProviderName, modelProvider);
             }
 
             DefaultProvider = ModelProviders[ConfigJson["defaultModel"]["defaultProvider"].Value<string>()];
             DefaultModelName = ConfigJson["defaultModel"]["defaultModelName"].Value<string>();
-            ApiUrl = DefaultProvider.ApiUrl;
-            Key = DefaultProvider.ApiKey;
 
-            logger.LogInformation($"Model: {DefaultModelName}, ApiUrl: {ApiUrl}");
+            logger.LogInformation($"Model: {DefaultModelName}, ApiUrl: {DefaultProvider.ApiUrl}");
         }
     }
 }

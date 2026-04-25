@@ -5,7 +5,7 @@ using System.Text;
 
 namespace Silmoon.AI.Models
 {
-    public class ModelProviders
+    public class ModelProvider
     {
         [JsonProperty("providerName")]
         public string ProviderName { get; set; }
@@ -15,9 +15,18 @@ namespace Silmoon.AI.Models
         public string ApiKey { get; set; }
         [JsonProperty("enable")]
         public bool Enable { get; set; } = true;
-
         [JsonProperty("models")]
         public List<Model> Models { get; set; } = [];
+
+        public static ModelProvider Create(string apiUrl, string apiKey, string modelName)
+        {
+            return new ModelProvider
+            {
+                ApiUrl = apiUrl,
+                ApiKey = apiKey,
+                Models = [new Model { Name = modelName }]
+            };
+        }
     }
 
     public class Model

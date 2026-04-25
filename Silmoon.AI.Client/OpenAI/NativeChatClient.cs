@@ -8,6 +8,7 @@ using Silmoon.Extensions;
 using Silmoon.Models;
 using System.Threading.Channels;
 using Silmoon.AI.Tools;
+using Silmoon.AI.Models;
 
 namespace Silmoon.AI.Client.OpenAI;
 
@@ -15,9 +16,8 @@ public class NativeChatClient : INativeChatClient
 {
     public event ToolCallInvokeHandler OnToolCallInvoke;
     public event Func<StateSet<bool, string>, Task<StateSet<bool, string>>> OnToolCallFinished;
-    public string ApiUrl { get; set; }
-    public string ApiKey { get; set; }
-    public string Model { get; set; }
+    public ModelProvider ModelProvider { get; set; }
+    public string ModelName { get; set; }
     SseHttpClient HttpClient { get; set; }
     public bool EnableThinking { get; set; } = false;
     public bool EnableSearch { get; set; } = false;
@@ -42,11 +42,18 @@ public class NativeChatClient : INativeChatClient
     }
     public List<Tool> Tools { get; set; } = [];
 
-    public NativeChatClient(string apiUrl, string apiKey, string model, string systemPrompt = null)
+    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null)
     {
-        ApiUrl = apiUrl;
-        ApiKey = apiKey;
-        Model = model;
+        ModelProvider = provider;
+        ModelName = modelName;
+        SystemPrompt = systemPrompt;
+
+        BuildHttpClient();
+    }
+    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null)
+    {
+        ModelProvider = ModelProvider.Create(apiUrl, apiKey, modelName);
+        ModelName = modelName;
         SystemPrompt = systemPrompt;
 
         BuildHttpClient();
@@ -56,7 +63,7 @@ public class NativeChatClient : INativeChatClient
     {
         HttpClient?.Dispose();
         HttpClient = new SseHttpClient();
-        HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ApiKey}");
+        HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
     public void ResetHistory(string continuation = null)
     {
@@ -85,18 +92,18 @@ public class NativeChatClient : INativeChatClient
     public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         chunks ??= [];
-        model ??= Model;
+        model ??= ModelName;
         while (true)
         {
             var request = new Request(model, [.. messageHistory]);
-            request.SetEnableThinking(EnableThinking, ApiUrl, string.Empty, model);
+            request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.EnableSearch = EnableSearch;
             request.Tools = tools ?? Tools;
 
 
             Channel<StateSet<bool, Chunk>> channel = Channel.CreateUnbounded<StateSet<bool, Chunk>>();
             bool channelClosed = false;
-            var callbackTask = HttpClient.CompletionsStreamAsync(ApiUrl + completionsUrl, request, async (chunkState) =>
+            var callbackTask = HttpClient.CompletionsStreamAsync(ModelProvider.ApiUrl + completionsUrl, request, async (chunkState) =>
             {
                 try
                 {
@@ -160,15 +167,15 @@ public class NativeChatClient : INativeChatClient
     }
     public async Task<Response> CompletionsAsync(List<MessageContent> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
-        model ??= Model;
+        model ??= ModelName;
         while (true)
         {
             Request request = new Request(model, [.. messageHistory]);
-            request.SetEnableThinking(EnableThinking, ApiUrl, string.Empty, model);
+            request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.EnableSearch = EnableSearch;
             request.Tools = tools ?? Tools;
 
-            var response = await HttpClient.CompletionsAsync(ApiUrl + completionsUrl, request);
+            var response = await HttpClient.CompletionsAsync(ModelProvider.ApiUrl + completionsUrl, request);
 
             Choice firstChoice = response.Data.Choices.FirstOrDefault();
             if (firstChoice?.FinishReason == "stop")
