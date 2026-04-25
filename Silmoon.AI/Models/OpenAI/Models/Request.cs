@@ -19,6 +19,8 @@ public class Request
     public int? TopK { get; set; }
     [JsonProperty("enable_thinking")]
     public bool? EnableThinking { get; set; }
+    [JsonProperty("thinking")]
+    public object? Thinking { get; set; }
     [JsonProperty("reasoning_effort")]
     public string? ReasoningEffort { get; set; }
     [JsonProperty("enable_search")]
@@ -28,10 +30,11 @@ public class Request
 
     public bool ShouldSerializeTools() => Tools != null && Tools.Count > 0;
 
-    public void SetEnableThinking(bool enableThinking, string apiUrl, string modelName)
+    public void SetEnableThinking(bool enableThinking, string apiUrl, string provider, string modelName)
     {
-        apiUrl = apiUrl.ToLower();
-        modelName = modelName.ToLower();
+        apiUrl = apiUrl?.ToLower();
+        modelName = modelName?.ToLower();
+        provider = provider?.ToLower();
         if (enableThinking)
         {
             EnableThinking = true;
@@ -41,9 +44,21 @@ public class Request
         {
             EnableThinking = false;
             ReasoningEffort = "none";
-
-            if (apiUrl.Contains("deepseek")) ReasoningEffort = null;
         }
+
+        if (apiUrl.Contains("deepseek"))
+        {
+            if (enableThinking)
+            {
+                Thinking = new { type = "enabled" };
+            }
+            else
+            {
+                Thinking = new { type = "disabled" };
+                ReasoningEffort = null;
+            }
+        }
+        else Thinking = false;
     }
 
     public Request(string model, MessageContent[] messages, bool stream = true)

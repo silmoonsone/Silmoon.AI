@@ -89,7 +89,7 @@ public class NativeChatClient : INativeChatClient
         while (true)
         {
             var request = new Request(model, [.. messageHistory]);
-            request.SetEnableThinking(EnableThinking, ApiUrl, model);
+            request.SetEnableThinking(EnableThinking, ApiUrl, string.Empty, model);
             request.EnableSearch = EnableSearch;
             request.Tools = tools ?? Tools;
 
@@ -164,7 +164,7 @@ public class NativeChatClient : INativeChatClient
         while (true)
         {
             Request request = new Request(model, [.. messageHistory]);
-            request.SetEnableThinking(EnableThinking, ApiUrl, model);
+            request.SetEnableThinking(EnableThinking, ApiUrl, string.Empty, model);
             request.EnableSearch = EnableSearch;
             request.Tools = tools ?? Tools;
 
