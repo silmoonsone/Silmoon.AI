@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.AI.Prompts;
@@ -65,6 +65,8 @@ public class MemoryTool : ExecuteTool
 
     public INativeChatClient NativeChatClient { get; set; }
 
+    public Tool[] Tools => throw new NotImplementedException();
+
     public MemoryTool(INativeChatClient nativeChatClient)
     {
         NativeChatClient = nativeChatClient;
@@ -118,5 +120,10 @@ public class MemoryTool : ExecuteTool
         }
 
         return Task.FromResult(results);
+    }
+
+    public void InjectToolCall(INativeChatClient nativeChatClient)
+    {
+        throw new NotImplementedException();
     }
 }

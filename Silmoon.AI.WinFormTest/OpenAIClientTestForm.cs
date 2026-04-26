@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
-using Silmoon.AI.Client.OpenAI;
 using Silmoon.AI.Models;
 using Silmoon.AI.Tools;
 using Silmoon.AI.Models.OpenAI.Enums;
@@ -15,6 +14,7 @@ using System.Data;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
+using Silmoon.AI.OpenAI;
 
 namespace Silmoon.AI.WinFormTest
 {

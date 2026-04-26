@@ -6,7 +6,7 @@ using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 
-namespace Silmoon.AI.Client.OpenAI;
+namespace Silmoon.AI.OpenAI;
 
 public class SseHttpClient : HttpClient
 {

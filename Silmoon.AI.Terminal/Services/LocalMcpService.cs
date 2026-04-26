@@ -1,5 +1,5 @@
-﻿using Silmoon.AI.Client.OpenAI;
-using Silmoon.AI.Interfaces;
+﻿using Silmoon.AI.Interfaces;
+using Silmoon.AI.OpenAI;
 using Silmoon.AI.Tools;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;

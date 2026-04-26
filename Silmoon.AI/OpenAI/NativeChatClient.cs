@@ -10,7 +10,7 @@ using System.Threading.Channels;
 using Silmoon.AI.Tools;
 using Silmoon.AI.Models;
 
-namespace Silmoon.AI.Client.OpenAI;
+namespace Silmoon.AI.OpenAI;
 
 public class NativeChatClient : INativeChatClient
 {

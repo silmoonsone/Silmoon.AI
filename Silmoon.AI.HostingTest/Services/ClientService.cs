@@ -1,6 +1,5 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
-using Silmoon.AI.Client.OpenAI;
 using Silmoon.AI.Models;
 using Silmoon.AI.Prompts;
 using Silmoon.AI.Tools;
@@ -10,6 +9,7 @@ using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using Silmoon.Models;
 using System;
+using Silmoon.AI.OpenAI;
 
 namespace Silmoon.AI.HostingTest.Services;
 

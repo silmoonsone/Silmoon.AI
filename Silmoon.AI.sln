@@ -16,13 +16,9 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "解决方案项", "解决�
 		README.md = README.md
 	EndProjectSection
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.Client", "Silmoon.AI.Client\Silmoon.AI.Client.csproj", "{B7EE48E6-D509-47DC-902F-FFBE32B93854}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.WinFormTest", "Silmoon.AI.WinFormTest\Silmoon.AI.WinFormTest.csproj", "{607443E8-970D-4A40-A083-D463F7420AFE}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.Terminal", "Silmoon.AI.Terminal\Silmoon.AI.Terminal.csproj", "{210D0239-B62A-4E73-A925-E1A85A1A70F0}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.Tools", "Silmoon.AI.Tools\Silmoon.AI.Tools.csproj", "{EECE411D-0813-4A64-A4B1-A66E984BA34C}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -38,10 +34,6 @@ Global
 		{02F1D6BD-5E7D-4961-8281-6CEACEDD9D99}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{02F1D6BD-5E7D-4961-8281-6CEACEDD9D99}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{02F1D6BD-5E7D-4961-8281-6CEACEDD9D99}.Release|Any CPU.Build.0 = Release|Any CPU
-		{B7EE48E6-D509-47DC-902F-FFBE32B93854}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{B7EE48E6-D509-47DC-902F-FFBE32B93854}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{B7EE48E6-D509-47DC-902F-FFBE32B93854}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{B7EE48E6-D509-47DC-902F-FFBE32B93854}.Release|Any CPU.Build.0 = Release|Any CPU
 		{607443E8-970D-4A40-A083-D463F7420AFE}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{607443E8-970D-4A40-A083-D463F7420AFE}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{607443E8-970D-4A40-A083-D463F7420AFE}.Release|Any CPU.ActiveCfg = Release|Any CPU
@@ -50,10 +42,6 @@ Global
 		{210D0239-B62A-4E73-A925-E1A85A1A70F0}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{210D0239-B62A-4E73-A925-E1A85A1A70F0}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{210D0239-B62A-4E73-A925-E1A85A1A70F0}.Release|Any CPU.Build.0 = Release|Any CPU
-		{EECE411D-0813-4A64-A4B1-A66E984BA34C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{EECE411D-0813-4A64-A4B1-A66E984BA34C}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{EECE411D-0813-4A64-A4B1-A66E984BA34C}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{EECE411D-0813-4A64-A4B1-A66E984BA34C}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
