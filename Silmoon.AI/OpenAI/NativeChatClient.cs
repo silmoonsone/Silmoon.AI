@@ -17,7 +17,8 @@ public class NativeChatClient : INativeChatClient
 {
     public event ToolCallStartHandler OnToolCallStart;
     public event ToolCallCompletedHandler OnToolCallCompleted;
-    public event NativeClientChatFinished OnNativeClientChatFinished;
+    public event StreamOutputCompletedHandler OnStreamOutputCompleted;
+    public event StreamOutputHandler OnStreamOutput;
     public ModelProvider ModelProvider { get; set; }
     public string ModelName { get; set; }
     SseHttpClient HttpClient { get; set; }
@@ -126,6 +127,7 @@ public class NativeChatClient : INativeChatClient
 
             await foreach (var chunk in channel.Reader.ReadAllAsync())
             {
+                OnStreamOutput?.Invoke(chunk);
                 yield return chunk;
             }
 
@@ -133,7 +135,7 @@ public class NativeChatClient : INativeChatClient
             if (chunkStates.State)
             {
                 var result = Result.Create([.. chunkStates.Data]);
-                OnNativeClientChatFinished?.Invoke(result);
+                OnStreamOutputCompleted?.Invoke(result);
                 if (result.FinishReason == "stop")
                 {
                     messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));

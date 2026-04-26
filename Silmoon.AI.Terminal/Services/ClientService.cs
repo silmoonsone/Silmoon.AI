@@ -29,7 +29,7 @@ public class ClientService : IHostedService
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.DefaultProvider, SilmoonConfigureService.DefaultModelName, UtilPrompt.ContextPrompt);
         NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
         NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallCompleted;
-        NativeChatClient.OnNativeClientChatFinished += NativeChatClient_OnNativeClientChatFinished;
+        NativeChatClient.OnStreamOutputCompleted += NativeChatClient_OnNativeClientChatFinished;
         LocalMcpService.InjectMcp(NativeChatClient);
         NativeChatClient.Tools.Add(Tool.Create("ToolCallTestTool", "This is a test tool_calling test tool.", []));
         //NativeChatClient.EnableThinking = true;

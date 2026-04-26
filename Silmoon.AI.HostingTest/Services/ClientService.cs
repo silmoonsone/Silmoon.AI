@@ -27,7 +27,7 @@ public class ClientService : IHostedService
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.ApiUrl, SilmoonConfigureService.Key, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
         NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
         NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallCompleted;
-        NativeChatClient.OnNativeClientChatFinished += NativeChatClient_OnNativeClientChatFinished;
+        NativeChatClient.OnStreamOutputCompleted += NativeChatClient_OnNativeClientChatFinished;
         NativeChatClient.Tools.AddRange(makeTools());
         new FileTool().InjectToolCall(NativeChatClient);
         new CommandTool().InjectToolCall(NativeChatClient);

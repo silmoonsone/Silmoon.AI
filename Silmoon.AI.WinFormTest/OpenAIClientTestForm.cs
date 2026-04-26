@@ -40,7 +40,7 @@ namespace Silmoon.AI.WinFormTest
             NativeChatClient = new NativeChatClient(ConfigureService.ConfigJson.Value<string>("apiUrl"), ConfigureService.ConfigJson.Value<string>("apiKey"), ConfigureService.ConfigJson.Value<string>("modelName"), systemPrompt);
             NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
             NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallCompleted;
-            NativeChatClient.OnNativeClientChatFinished += NativeChatClient_OnNativeClientChatFinished;
+            NativeChatClient.OnStreamOutputCompleted += NativeChatClient_OnNativeClientChatFinished;
             NativeChatClient.Tools.AddRange(makeTools());
             new FileTool().InjectToolCall(NativeChatClient);
             new CommandTool().InjectToolCall(NativeChatClient);
