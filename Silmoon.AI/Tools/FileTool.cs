@@ -7,6 +7,7 @@ using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 
@@ -14,7 +15,7 @@ namespace Silmoon.AI.Tools
 {
     public class FileTool : ExecuteTool
     {
-        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults) => await CallTool(toolCallParameters, toolCallResults);
+        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults) => await CallTool(toolCallParameters, toolCallResults);
         public override Tool[] GetTools()
         {
             return [
@@ -32,7 +33,7 @@ namespace Silmoon.AI.Tools
         }
 
 
-        public static Task<List<ToolCallResult>> CallTool(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults)
+        public static Task<List<ToolCallResult>> CallTool(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
         {
             List<ToolCallResult> results = [];
 

@@ -9,6 +9,7 @@ using Silmoon.Models;
 using System.Threading.Channels;
 using Silmoon.AI.Tools;
 using Silmoon.AI.Models;
+using System.Collections.Concurrent;
 
 namespace Silmoon.AI.OpenAI;
 
@@ -16,6 +17,7 @@ public class NativeChatClient : INativeChatClient
 {
     public event ToolCallStartHandler OnToolCallStart;
     public event ToolCallCompletedHandler OnToolCallCompleted;
+    public event NativeClientChatFinished OnNativeClientChatFinished;
     public ModelProvider ModelProvider { get; set; }
     public string ModelName { get; set; }
     SseHttpClient HttpClient { get; set; }
@@ -131,6 +133,7 @@ public class NativeChatClient : INativeChatClient
             if (chunkStates.State)
             {
                 var result = Result.Create([.. chunkStates.Data]);
+                OnNativeClientChatFinished?.Invoke(result);
                 if (result.FinishReason == "stop")
                 {
                     messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
@@ -184,6 +187,10 @@ public class NativeChatClient : INativeChatClient
             var response = await HttpClient.CompletionsAsync(ModelProvider.ApiUrl + completionsUrl, request);
 
             Choice firstChoice = response.Data.Choices.FirstOrDefault();
+
+            //temp ignore this event.
+            //OnNativeClientChatFinished?.Invoke(Result.Create(response.Data.Choices));
+
             if (firstChoice?.FinishReason == "stop")
             {
                 messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
@@ -220,18 +227,23 @@ public class NativeChatClient : INativeChatClient
     {
         try
         {
-            Dictionary<string, ToolCallResult> results = [];
+            ConcurrentDictionary<string, ToolCallResult> results = [];
+            List<Task> handlerTasks = [];
             foreach (ToolCallStartHandler handler in OnToolCallStart.GetInvocationList().Cast<ToolCallStartHandler>())
             {
-                var toolCallResults = await handler(toolCallParameters, results);
-                if (toolCallResults is not null)
+                handlerTasks.Add(Task.Run(async () =>
                 {
-                    foreach (var item in toolCallResults)
+                    var toolCallResults = await handler(toolCallParameters, results);
+                    if (toolCallResults is not null)
                     {
-                        results[item.Parameter.ToolCallId] = item;
+                        foreach (var item in toolCallResults)
+                        {
+                            results[item.Parameter.ToolCallId] = item;
+                        }
                     }
-                }
+                }));
             }
+            await Task.WhenAll([.. handlerTasks]);
 
             foreach (var item in toolCallParameters)
             {

@@ -34,7 +34,7 @@ namespace Silmoon.AI.Tools
         static readonly ConcurrentDictionary<string, DateTimeOffset> SessionClosedIntentionallyAt = new();
         const double TombstoneRetentionHours = 168; // 7 天后遗忘，避免字典无限增长
 
-        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults) => await ToolCall(toolCallParameters, toolCallResults);
+        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults) => await ToolCall(toolCallParameters, toolCallResults);
 
 
         public override Tool[] GetTools()
@@ -110,7 +110,7 @@ namespace Silmoon.AI.Tools
         /// <summary>
         /// 分发 <see cref="GetTools"/> 中注册的 <c>CommandTool</c>（无状态）与 <c>StatefulCommandExecuteTool*</c>（有状态）工具；有状态实现对应 <c>ExecuteCommand</c> / <c>GetCommandOutput</c> / <c>GetShellSessionStatus</c> / <c>CloseCommand</c>。
         /// </summary>
-        public static Task<List<ToolCallResult>> ToolCall(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults)
+        public static Task<List<ToolCallResult>> ToolCall(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
         {
             List<ToolCallResult> results = [];
 

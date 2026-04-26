@@ -1,15 +1,16 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Prompts;
-using Silmoon.AI.Tools;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI;
+using Silmoon.AI.Prompts;
+using Silmoon.AI.Tools;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using Silmoon.Models;
 using System;
-using Silmoon.AI.OpenAI;
+using System.Collections.Concurrent;
 
 namespace Silmoon.AI.HostingTest.Services;
 
@@ -26,6 +27,7 @@ public class ClientService : IHostedService
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.ApiUrl, SilmoonConfigureService.Key, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
         NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
         NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallCompleted;
+        NativeChatClient.OnNativeClientChatFinished += NativeChatClient_OnNativeClientChatFinished;
         NativeChatClient.Tools.AddRange(makeTools());
         new FileTool().InjectToolCall(NativeChatClient);
         new CommandTool().InjectToolCall(NativeChatClient);
@@ -35,7 +37,14 @@ public class ClientService : IHostedService
         //NativeChatClient.EnableThinking = true;
     }
 
-    private Task<Dictionary<string, ToolCallResult>> NativeChatClient_OnToolCallCompleted(Dictionary<string, ToolCallResult> toolCallResults)
+    private async Task NativeChatClient_OnNativeClientChatFinished(Result result)
+    {
+        Console.WriteLine();
+        Console.WriteLine("stop reason: " + result.FinishReason);
+        await Task.CompletedTask;
+    }
+
+    private Task<ConcurrentDictionary<string, ToolCallResult>> NativeChatClient_OnToolCallCompleted(ConcurrentDictionary<string, ToolCallResult> toolCallResults)
     {
         foreach (var toolCallResult in toolCallResults.Values)
         {
@@ -44,7 +53,7 @@ public class ClientService : IHostedService
         }
         return Task.FromResult(toolCallResults);
     }
-    private async Task<List<ToolCallResult>> NativeChatClient_OnToolCallStart(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults)
+    private async Task<List<ToolCallResult>> NativeChatClient_OnToolCallStart(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
     {
         List<ToolCallResult> results = [];
 
@@ -148,9 +157,7 @@ public class ClientService : IHostedService
                             }
                             else Console.WriteLineWithColor(chunk.Message, ConsoleColor.Red);
                         }
-                        Console.WriteLine();
                         var result = Result.Create([.. chunks]);
-                        Console.WriteLine($"FinishReason={result.FinishReason}");
                         if (result.FinishReason == "tool_calls") Console.WriteWithColor(result.ToolCalls.ToFormattedJsonString(), ConsoleColor.DarkYellow);
                     }
                     else

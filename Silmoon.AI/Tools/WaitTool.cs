@@ -6,6 +6,7 @@ using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
+using System.Collections.Concurrent;
 
 namespace Silmoon.AI.Tools;
 
@@ -37,7 +38,7 @@ public class WaitTool : ExecuteTool
         ];
     }
 
-    public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults)
+    public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
     {
         List<ToolCallResult> results = [];
 

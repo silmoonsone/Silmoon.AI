@@ -1,20 +1,21 @@
 ﻿using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Tools;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI;
+using Silmoon.AI.Tools;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Services;
 using Silmoon.Models;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.ComponentModel;
 using System.Data;
 using System.Drawing;
 using System.Text;
 using System.Windows.Forms;
-using Silmoon.AI.OpenAI;
 
 namespace Silmoon.AI.WinFormTest
 {
@@ -39,6 +40,7 @@ namespace Silmoon.AI.WinFormTest
             NativeChatClient = new NativeChatClient(ConfigureService.ConfigJson.Value<string>("apiUrl"), ConfigureService.ConfigJson.Value<string>("apiKey"), ConfigureService.ConfigJson.Value<string>("modelName"), systemPrompt);
             NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
             NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallCompleted;
+            NativeChatClient.OnNativeClientChatFinished += NativeChatClient_OnNativeClientChatFinished;
             NativeChatClient.Tools.AddRange(makeTools());
             new FileTool().InjectToolCall(NativeChatClient);
             new CommandTool().InjectToolCall(NativeChatClient);
@@ -46,7 +48,15 @@ namespace Silmoon.AI.WinFormTest
             // Inject 须在宿主 OnToolCallStart 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool 对未知函数名的结果
             new MemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
         }
-        private Task<Dictionary<string, ToolCallResult>> NativeChatClient_OnToolCallCompleted(Dictionary<string, ToolCallResult> toolCallResults)
+
+        private async Task NativeChatClient_OnNativeClientChatFinished(Result result)
+        {
+            Console.WriteLine();
+            Console.WriteLine("stop reason: " + result.FinishReason);
+            await Task.CompletedTask;
+        }
+
+        private Task<ConcurrentDictionary<string, ToolCallResult>> NativeChatClient_OnToolCallCompleted(ConcurrentDictionary<string, ToolCallResult> toolCallResults)
         {
             foreach (var toolCallResult in toolCallResults.Values)
             {
@@ -55,7 +65,7 @@ namespace Silmoon.AI.WinFormTest
             }
             return Task.FromResult(toolCallResults);
         }
-        private async Task<List<ToolCallResult>> NativeChatClient_OnToolCallStart(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults)
+        private async Task<List<ToolCallResult>> NativeChatClient_OnToolCallStart(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
         {
             List<ToolCallResult> results = [];
 
@@ -133,9 +143,7 @@ namespace Silmoon.AI.WinFormTest
                 }
                 else Console.WriteLineWithColor(chunk.Message, ConsoleColor.Red);
             }
-            Console.WriteLine();
             var result = Result.Create([.. chunks]);
-            Console.WriteLine($"FinishReason={result.FinishReason}");
             if (result.FinishReason == "tool_calls") Console.WriteWithColor(result.ToolCalls.ToFormattedJsonString(), ConsoleColor.DarkYellow);
         }
     }

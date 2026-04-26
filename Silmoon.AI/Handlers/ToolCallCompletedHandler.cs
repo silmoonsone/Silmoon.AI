@@ -2,10 +2,11 @@
 using Silmoon.AI.Models;
 using Silmoon.Models;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 
 namespace Silmoon.AI.Handlers
 {
-    public delegate Task<Dictionary<string, ToolCallResult>> ToolCallCompletedHandler(Dictionary<string, ToolCallResult> toolCallResults);
+    public delegate Task<ConcurrentDictionary<string, ToolCallResult>> ToolCallCompletedHandler(ConcurrentDictionary<string, ToolCallResult> toolCallResults);
 }

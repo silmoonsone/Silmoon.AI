@@ -4,6 +4,7 @@ using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Models;
 using System;
+using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.Text;
 
@@ -14,6 +15,6 @@ namespace Silmoon.AI.Interfaces
         Tool[] Tools { get; }
         Tool[] GetTools();
         void InjectToolCall(INativeChatClient nativeChatClient);
-        Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults);
+        Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults);
     }
 }
