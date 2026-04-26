@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using Silmoon.AI.Interfaces;
+using Silmoon.AI.Models;
 using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Models;
@@ -24,6 +25,6 @@ namespace Silmoon.AI.Tools
             nativeChatClient.OnToolCallStart += OnToolCallInvoke;
         }
 
-        public abstract Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState);
+        public abstract Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults);
     }
 }

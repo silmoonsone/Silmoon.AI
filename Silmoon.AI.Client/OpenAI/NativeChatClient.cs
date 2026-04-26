@@ -141,13 +141,19 @@ public class NativeChatClient : INativeChatClient
                     messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
                     if (!result.ToolCalls.IsNullOrEmpty())
                     {
-                        string functionName = result.ToolCalls[0].Function.Name;
-                        JObject parameters = result.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ? [] : JsonConvert.DeserializeObject<JObject>(result.ToolCalls[0].Function.Arguments);
-                        var toolCallResult = await ToolCall(functionName, parameters, result.ToolCalls[0].Id);
+                        ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(result.ToolCalls);
+                        var toolCallResults = await ToolCalls(toolCallParameters);
 
-                        if (functionName != MemoryTool.ApplyMemoryToolFunctionName || !toolCallResult.State)
+                        if (toolCallParameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                         {
-                            messageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), result.ToolCalls[0].Id));
+                            // 如果是纯记忆工具调用且成功，则不将工具调用结果添加到消息历史中，以免干扰模型的理解
+                        }
+                        else
+                        {
+                            foreach (var item in toolCallResults)
+                            {
+                                messageHistory.Add(MessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
+                            }
                         }
                         continue;
                     }
@@ -188,13 +194,19 @@ public class NativeChatClient : INativeChatClient
                 messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
                 if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
                 {
-                    string functionName = firstChoice?.Message?.ToolCalls[0].Function.Name;
-                    JObject parameters = firstChoice?.Message?.ToolCalls[0].Function.Arguments.IsNullOrEmpty() ?? false ? [] : JsonConvert.DeserializeObject<JObject>(firstChoice?.Message?.ToolCalls[0].Function.Arguments);
-                    var toolCallResult = await ToolCall(functionName, parameters, firstChoice?.Message?.ToolCalls[0].Id);
+                    ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(firstChoice?.Message?.ToolCalls);
+                    var toolCallResults = await ToolCalls(toolCallParameters);
 
-                    if (functionName != MemoryTool.ApplyMemoryToolFunctionName || !toolCallResult.State)
+                    if (toolCallParameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                     {
-                        messageHistory.Add(MessageContent.Create(Role.Tool, toolCallResult.ToJsonString(), firstChoice?.Message?.ToolCalls[0].Id));
+                        // 如果是纯记忆工具调用且成功，则不将工具调用结果添加到消息历史中，以免干扰模型的理解
+                    }
+                    else
+                    {
+                        foreach (var item in toolCallResults)
+                        {
+                            messageHistory.Add(MessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
+                        }
                     }
                     continue;
                 }
@@ -203,24 +215,37 @@ public class NativeChatClient : INativeChatClient
         }
     }
 
-    async Task<StateSet<bool, string>> ToolCall(string functionName, JObject parameters, string toolCallId)
+
+    async Task<List<ToolCallResult>> ToolCalls(ToolCallParameter[] toolCallParameters)
     {
         try
         {
-            StateSet<bool, string> result = null;
+            Dictionary<string, ToolCallResult> results = [];
             foreach (ToolCallStartHandler handler in OnToolCallStart.GetInvocationList().Cast<ToolCallStartHandler>())
             {
-                var tmpResult = await handler(functionName, parameters, toolCallId, result);
-                if (tmpResult is not null) result = tmpResult;
+                var toolCallResults = await handler(toolCallParameters, results);
+                if (toolCallResults is not null)
+                {
+                    foreach (var item in toolCallResults)
+                    {
+                        results[item.Parameter.ToolCallId] = item;
+                    }
+                }
             }
-            result ??= false.ToStateSet<string>(null, $"function {functionName} not implemented.");
-            result = await (OnToolCallCompleted?.Invoke(result) ?? Task.FromResult(result));
-            return result;
+
+            foreach (var item in toolCallParameters)
+            {
+                if (!results.ContainsKey(item.ToolCallId))
+                {
+                    results[item.ToolCallId] = ToolCallResult.Create(item, false.ToStateSet<string>(null, $"function {item.FunctionName} not implemented."));
+                }
+            }
+            results = await (OnToolCallCompleted?.Invoke(results) ?? Task.FromResult(results));
+            return [.. results.Values];
         }
         catch (Exception ex)
         {
-            return false.ToStateSet<string>(null, $"执行函数 {functionName} 时发生异常: {ex.Message}");
+            return [ToolCallResult.Create(null, false.ToStateSet<string>(null, $"执行工具调用发生异常: {ex.Message}"))];
         }
     }
-
 }

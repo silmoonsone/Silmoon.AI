@@ -1,5 +1,6 @@
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Silmoon.AI.Models;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
@@ -36,34 +37,49 @@ public class WaitTool : ExecuteTool
         ];
     }
 
-    public override async Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
+    public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults)
     {
-        if (functionName != "WaitTool") return null;
+        List<ToolCallResult> results = [];
 
-        var token = parameters["durationMilliseconds"];
-        if (token is null || token.Type == JTokenType.Null) return false.ToStateSet<string>(null, "durationMilliseconds is required.");
-
-        int ms;
-        try
+        foreach (var parameter in toolCallParameters)
         {
-            ms = token.Type == JTokenType.Integer ? token.Value<int>() : (int)Math.Round(token.Value<double>());
+            var functionName = parameter.FunctionName;
+            var parameters = parameter.Parameters;
+
+            if (functionName == "WaitTool")
+            {
+                var token = parameters["durationMilliseconds"];
+                if (token is null || token.Type == JTokenType.Null)
+                {
+                    results.Add(ToolCallResult.Create(parameter, false.ToStateSet<string>(null, "durationMilliseconds is required.")));
+                }
+                else
+                {
+                    int ms;
+                    try
+                    {
+                        ms = token.Type == JTokenType.Integer ? token.Value<int>() : (int)Math.Round(token.Value<double>());
+                        if (ms < MinDurationMs) ms = MinDurationMs;
+                        if (ms > MaxDurationMs) ms = MaxDurationMs;
+
+                        await Task.Delay(ms).ConfigureAwait(false);
+
+                        string? reason = parameters["reason"]?.Type == JTokenType.String ? parameters["reason"]?.Value<string>() : parameters["reason"]?.ToString();
+                        var payload = JsonConvert.SerializeObject(new
+                        {
+                            waitedMilliseconds = ms,
+                            reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
+                        });
+                        results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(payload)));
+                    }
+                    catch
+                    {
+                        results.Add(ToolCallResult.Create(parameter, false.ToStateSet<string>(null, "durationMilliseconds must be a number.")));
+                    }
+                }
+            }
         }
-        catch
-        {
-            return false.ToStateSet<string>(null, "durationMilliseconds must be a number.");
-        }
 
-        if (ms < MinDurationMs) ms = MinDurationMs;
-        if (ms > MaxDurationMs) ms = MaxDurationMs;
-
-        await Task.Delay(ms).ConfigureAwait(false);
-
-        string? reason = parameters["reason"]?.Type == JTokenType.String ? parameters["reason"]?.Value<string>() : parameters["reason"]?.ToString();
-        var payload = JsonConvert.SerializeObject(new
-        {
-            waitedMilliseconds = ms,
-            reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
-        });
-        return true.ToStateSet<string>(payload);
+        return results;
     }
 }

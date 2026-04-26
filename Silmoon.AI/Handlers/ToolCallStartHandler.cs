@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
+using Silmoon.AI.Models;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Models;
 using System;
@@ -7,5 +8,5 @@ using System.Text;
 
 namespace Silmoon.AI.Handlers
 {
-    public delegate Task<StateSet<bool, string>> ToolCallStartHandler(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState);
+    public delegate Task<List<ToolCallResult>> ToolCallStartHandler(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults);
 }

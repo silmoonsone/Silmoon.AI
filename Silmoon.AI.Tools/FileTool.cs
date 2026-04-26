@@ -1,5 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using Silmoon.AI.Interfaces;
+using Silmoon.AI.Models;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
@@ -13,7 +14,7 @@ namespace Silmoon.AI.Tools
 {
     public class FileTool : ExecuteTool
     {
-        public override async Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState) => await CallTool(functionName, parameters, toolCallId);
+        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults) => await CallTool(toolCallParameters, toolCallResults);
         public override Tool[] GetTools()
         {
             return [
@@ -31,20 +32,26 @@ namespace Silmoon.AI.Tools
         }
 
 
-        public static Task<StateSet<bool, string>> CallTool(string functionName, JObject parameters, string toolCallId)
+        public static Task<List<ToolCallResult>> CallTool(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults)
         {
-            StateSet<bool, string> result = null;
+            List<ToolCallResult> results = [];
 
-            switch (functionName)
+            foreach (var parameter in toolCallParameters)
             {
-                case "FileTool":
-                    var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
-                    result = true.ToStateSet<string>(fileSystemResult.ToJsonString());
-                    break;
-                default:
-                    break;
+                var functionName = parameter.FunctionName;
+                var parameters = parameter.Parameters;
+
+                switch (functionName)
+                {
+                    case "FileTool":
+                        var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
+                        results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(fileSystemResult.ToJsonString())));
+                        break;
+                    default:
+                        break;
+                }
             }
-            return Task.FromResult(result);
+            return Task.FromResult(results);
         }
 
         static StateSet<bool, string> ExecuteTool(string action, string path, string content)

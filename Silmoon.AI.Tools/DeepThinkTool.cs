@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
+using Silmoon.AI.Models;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
@@ -32,42 +33,51 @@ namespace Silmoon.AI.Tools
                 ]),
             ];
         }
-        public override async Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState)
+        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults)
         {
-            if (functionName == "ask")
+            List<ToolCallResult> results = [];
+
+            foreach (var parameter in toolCallParameters)
             {
-                string system = parameters["system"]?.ToString();
-                string content = parameters["content"].ToString();
-                //bool reasonContent = parameters["reasonContent"]?.Value<bool>() ?? false;
+                var functionName = parameter.FunctionName;
+                var parameters = parameter.Parameters;
 
-                if (system is not null) NativeChatClient.SystemPrompt = system;
-
-                List<Chunk> chunks = [];
-                Console.WriteLineWithColor("Agent response start:", ConsoleColor.Green, ConsoleColor.Blue);
-                await foreach (var chunk in NativeChatClient.CompletionsStreamAsync([MessageContent.Create(Role.User, content)], chunks))
+                if (functionName == "ask")
                 {
-                    if (chunk.State)
-                    {
-                        chunk.Data.Choices.Each(x =>
-                        {
-                            if (x.Delta?.ToolCalls is not null) Console.Write(".");
-                            else
-                            {
-                                Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.DarkGray);
-                                Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
-                            }
-                        });
-                    }
-                    else Console.WriteLineWithColor(chunk.Message);
-                }
-                Console.WriteLine();
-                Console.WriteLineWithColor("Agent response end:", ConsoleColor.Green, ConsoleColor.Blue);
-                var result = Result.Create([.. chunks]);
+                    string system = parameters["system"]?.ToString();
+                    string content = parameters["content"].ToString();
+                    //bool reasonContent = parameters["reasonContent"]?.Value<bool>() ?? false;
 
-                return true.ToStateSet<string>(result.ToJsonString());
+                    if (system is not null) NativeChatClient.SystemPrompt = system;
+
+                    List<Chunk> chunks = [];
+                    Console.WriteLineWithColor("Agent response start:", ConsoleColor.Green, ConsoleColor.Blue);
+                    await foreach (var chunk in NativeChatClient.CompletionsStreamAsync([MessageContent.Create(Role.User, content)], chunks))
+                    {
+                        if (chunk.State)
+                        {
+                            chunk.Data.Choices.Each(x =>
+                            {
+                                if (x.Delta?.ToolCalls is not null) Console.Write(".");
+                                else
+                                {
+                                    Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.DarkGray);
+                                    Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
+                                }
+                            });
+                        }
+                        else Console.WriteLineWithColor(chunk.Message);
+                    }
+                    Console.WriteLine();
+                    Console.WriteLineWithColor("Agent response end:", ConsoleColor.Green, ConsoleColor.Blue);
+                    var result = Result.Create([.. chunks]);
+
+                    results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(result.ToJsonString())));
+                    break;
+                }
             }
-            else
-                return null;
+
+            return results;
         }
     }
 }

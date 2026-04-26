@@ -1,4 +1,5 @@
 ﻿using Newtonsoft.Json.Linq;
+using Silmoon.AI.Models;
 using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Models;
@@ -13,6 +14,6 @@ namespace Silmoon.AI.Interfaces
         Tool[] Tools { get; }
         Tool[] GetTools();
         void InjectToolCall(INativeChatClient nativeChatClient);
-        Task<StateSet<bool, string>> OnToolCallInvoke(string functionName, JObject parameters, string toolCallId, StateSet<bool, string> toolMessageState);
+        Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, Dictionary<string, ToolCallResult> toolCallResults);
     }
 }
