@@ -20,6 +20,10 @@ public class SseHttpClient : HttpClient
     {
 
     }
+    public SseHttpClient(bool disableProxy) : base(new HttpClientHandler { UseProxy = !disableProxy, Proxy = null })
+    {
+
+    }
     public SseHttpClient(HttpClientHandler httpClientHandler) : base(httpClientHandler)
     {
 

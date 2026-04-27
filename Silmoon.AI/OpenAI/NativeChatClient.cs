@@ -45,7 +45,7 @@ public class NativeChatClient : INativeChatClient
     }
     public List<Tool> Tools { get; set; } = [];
 
-    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null)
+    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false)
     {
         ModelProvider = provider;
         ModelName = modelName;
@@ -53,7 +53,7 @@ public class NativeChatClient : INativeChatClient
 
         BuildHttpClient();
     }
-    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null)
+    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null, bool disableProxy = false)
     {
         ModelProvider = ModelProvider.Create(apiUrl, apiKey, modelName);
         ModelName = modelName;
@@ -62,10 +62,10 @@ public class NativeChatClient : INativeChatClient
         BuildHttpClient();
     }
 
-    void BuildHttpClient()
+    void BuildHttpClient(bool disableProxy = false)
     {
         HttpClient?.Dispose();
-        HttpClient = new SseHttpClient();
+        HttpClient = new SseHttpClient(disableProxy);
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
     public void ResetHistory(string continuation = null)
