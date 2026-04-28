@@ -23,9 +23,11 @@ namespace Silmoon.AI.Tools
         {
             return [
                 Tool.Create("ask", """
-                Delegate a **hard** task to the stronger model (same client stack); returns its reply. **Use:** hard reasoning, review, security, design, long analysis. **Skip:** trivial Q&A the main model handles (cost/latency).
-
-                Empty `system` = don’t override delegation prompt; if set, overrides system for this call only (host behavior).
+                Delegate hard tasks to a stronger model and return its reply.
+                Use for: deep reasoning, code review, security analysis, architecture/design, long-form analysis.
+                Skip for simple questions the current model can answer directly.
+                Concurrency: singleton, serial only; never run multiple `ask` calls in parallel.
+                `system` is optional: empty keeps default delegation prompt; non-empty overrides it for this call.
                 """,
                 [
                     new ToolParameterProperty("string", "system", "Optional. Role, format, language. Omit to keep default."),

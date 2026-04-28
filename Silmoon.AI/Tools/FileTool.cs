@@ -20,9 +20,11 @@ namespace Silmoon.AI.Tools
         {
             return [
                 Tool.Create("FileTool", """
-                UTF-8 **text** read/write whole file. Prefer over huge terminal pipes for configs/logs/code. **Not:** binary; unconfirmed sensitive paths; shell-specific behavior → command tools.
-
-                Response: JSON result; **read** returns file text in payload; **write** replaces entire file (create parents first).
+                UTF-8 text file read/write (whole-file).
+                Prefer for configs/logs/code text; do not use for binary or shell-dependent behavior.
+                Concurrency: parallel is allowed for independent files/operations.
+                Ordered dependency must be serial (e.g., `write same file -> read verify`); do not parallelize dependent steps.
+                Response is JSON: `read` returns file content; `write` replaces entire file (parent directories must exist).
                 """,
                 [
                     new ToolParameterProperty("string", "action", "`read` | `write` (full replace).", ["write", "read"], true),

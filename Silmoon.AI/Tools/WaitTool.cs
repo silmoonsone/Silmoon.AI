@@ -25,11 +25,12 @@ public class WaitTool : ExecuteTool
     {
         return [
             Tool.Create("WaitTool", """
-            **Purpose:** Pause for a fixed **wall-clock** duration, then return. Use to **space retries**, slow loops, or pause before a follow-up check. **Not** for shell/output waits → **StatefulCommand***.
-
-            **User-visible transparency (mandatory):** In the **same turn** as this call, your message to the human **must** state **how long** you will wait: give **`durationMilliseconds`** and **seconds** (e.g. `durationMilliseconds=5000` → 5s). **Forbidden:** only vague text (“等一下”“稍后再测”) **without** the numeric duration. Prefer **asking the user** to confirm the wait when it is not obvious; if they already chose a duration, **repeat** it when calling.
-
-            **Limits:** Clamped server-side to **100 ms–300 s** (5 min).
+            Pause for a fixed wall-clock duration, then return.
+            Use for retry spacing / throttling; not for shell output waiting (use `StatefulCommand*`).
+            In the same assistant turn, always state exact wait (`durationMilliseconds` and seconds); avoid vague “wait a bit”.
+            Parallel waits are possible but usually not useful and can be ambiguous; prefer one call with total duration (e.g., `6000` once, not two parallel `3000`).
+            Default: one wait call per decision step; multiple waits only for truly independent branches.
+            Limits: clamped to **100 ms–300 s**.
             """,
             [
                 new ToolParameterProperty("integer", "durationMilliseconds", $"Ms to wait (clamped {MinDurationMs}–{MaxDurationMs}). **Same turn:** tell the user this value + seconds before/around the call.", null, true),

@@ -43,7 +43,10 @@ namespace Silmoon.AI.Tools
                 Tool.Create("CommandTool", """
                 **Stateless:** new process each call—no persistent cwd/env.
 
-                **Use only for** fast, one-shot commands whose output is complete when the process exits (short `&&`/`;` pipeline on **one line** is OK). **Not for:** waiting/streaming output, long builds/tests, polling, or multi-step same-shell work—use **StatefulCommand*** (`Execute` + `GetOutput`).
+                **Use for:** fast one-shot commands whose output is complete at process exit (single-line `&&`/`;` is OK).
+                **Do not use for:** streaming/polling/long jobs or multi-step same-shell workflows → use **StatefulCommand***.
+
+                **Concurrency:** parallel is allowed (isolated processes). If B depends on A, run serially; if independent, parallel is preferred for batch results.
 
                 **Params:** `os` = Windows|MacOS|Linux; Windows needs `terminalType` CMD|PowerShell; Mac/Linux Bash or omit. Case-insensitive.
 
@@ -55,25 +58,14 @@ namespace Silmoon.AI.Tools
                     new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or null.", ["CMD", "PowerShell", "Bash", null], true),
                 ]),
                 Tool.Create("StatefulCommandExecuteTool", """
-                **Stateful:** one persistent shell—use for waiting/streaming/polling, multi-step same cwd/env, or anything stateless **CommandTool** cannot do.
-
-                **Policy:** Keep the same **`instanceId`** for the whole task. **Do not** call **Close** after a single step—only when the user asks or **all** work in this shell is done. Remember: id, cwd, SSH vs local (below), remaining steps. If alive/unknown → **GetSessionStatus**, not Close.
-
-                **Waits (human + transparency):** Prefer **asking the user** to pick `timeoutMilliseconds` / GetOutput’s `waitMilliseconds` (or offer 3s/10s/30s) when duration is unclear; follow a stated budget. **In the same assistant message as each Execute/GetOutput call**, state the exact values (ms + seconds, e.g. `timeoutMilliseconds=45000` → 45s after send; GetOutput `waitMilliseconds=0` = read now). No vague-only lines (“wait until done” / “轮询” without numbers). Each poll: say that call’s wait or 0. Ask first if not agreed.
-
-                **Singleton:** one active shell; **new** `instanceId` replaces the old. Don’t switch id mid-task.
-
-                **One line per Execute**—no `&&`/`;` multi-step in one `command`; separate calls.
-
-                **SSH:** After `ssh user@host`, later lines run **on the remote** until `exit`/`logout`. Track local vs remote; don’t mix paths/`localhost`. Confirm with `hostname`/`pwd` if unsure.
-
-                **`timeoutMilliseconds`:** ms to sleep **after sending the line** before returning buffered output (shell keeps running). Larger = longer stall before you see the reply—use **~2–8s** for quick work, **30–60s** only for slow I/O; poll **GetOutput** instead of only maxing timeout.
-
-                **Flow:** Execute → GetOutput (optional `waitMilliseconds`) → GetSessionStatus if unsure → **Close** rarely (see Close tool).
-
-                **Params:** same `os`/`terminalType` as stateless CommandTool.
-
-                **Safety:** as stateless CommandTool.
+                **Stateful persistent shell (global singleton):** use for multi-step same cwd/env, streaming output, polling, and long-running command checks.
+                **Session rules:** keep one stable `instanceId` per task; new id replaces old active shell; do not switch id mid-task.
+                **Concurrency:** stateful calls are serial only for the same task/session (`Execute -> GetOutput -> next step`), no parallel Execute/GetOutput.
+                **Command shape:** one line per Execute, no chained multi-step `&&`/`;`.
+                **Wait transparency:** every Execute/GetOutput must state exact wait in the same assistant message (`timeoutMilliseconds` / `waitMilliseconds`, ms + seconds). Avoid vague wait wording.
+                **SSH:** after `ssh`, subsequent commands are remote until `exit`; track local vs remote context.
+                **Flow:** Execute -> GetOutput (optional wait) -> GetSessionStatus when unsure -> Close only when user asks or all work is done.
+                **Params/Safety:** same `os`/`terminalType` semantics as `CommandTool`; no destructive/privileged ops without approval.
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "One stable id for the entire task; reuse on Execute/GetOutput/GetSessionStatus until done.", null, true),
@@ -83,24 +75,25 @@ namespace Silmoon.AI.Tools
                     new ToolParameterProperty("integer", "timeoutMilliseconds", "Ms after send before snapshot; shell survives. State ms+seconds to user. Typical 2000–8000 fast; 30000+ slow. Poll GetOutput if needed.", null, true),
                 ]),
                 Tool.Create("StatefulCommandGetOutputTool", """
-                Read **new** stdout/stderr since last GetOutput/Execute; no new input. Same **`instanceId`** as Execute; wrong id → tool returns active id (update your memory). If SSH session active, output is **remote**.
-
-                **`waitMilliseconds`:** sleep this long **before** reading (0 = now). Use >0 for trickling output (`ping`, logs). Same **wait transparency** as Execute (state ms+seconds to user; ask user when unclear). Typical 1000–5000 if pre-waiting.
-
-                Reports whether shell still runs.
+                Read **new** stdout/stderr since last Execute/GetOutput (no input). Use the same `instanceId` as Execute; if id mismatches, use the active id returned by tool.
+                `waitMilliseconds` waits before reading (`0` = immediate), useful for trickling logs.
+                Same transparency as Execute: state exact wait (ms + seconds). Output also reports whether shell is still running.
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "Must match active session (same as Execute).", null, true),
                     new ToolParameterProperty("integer", "waitMilliseconds", "Pre-read wait ms (0=immediate). State value to user. Ask user if unsure. Max clamped server-side.", null, false),
                 ]),
                 Tool.Create("StatefulCommandGetSessionStatusTool", """
-                Status only (no command, no log tail). Prefer this over **Close** when unsure if shell is alive. Wrong `instanceId` → response includes **active** id—use it on next Execute/GetOutput. SSH local/remote not labeled here—you track that.
+                Status only (no command/output read). Use when unsure whether shell is alive; prefer this over Close for probing.
+                Wrong `instanceId` returns active id; use that for next Execute/GetOutput.
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "Believed active id; tool may return the real active id.", null, true),
                 ]),
                 Tool.Create("StatefulCommandCloseTool", """
-                **Rare.** Default: **keep shell open** with same `instanceId`. Call only if user asked to close **or** all work in this shell is **done** and no more Execute needed. **Not** for cleanup, habit, or end-of-turn—next user message may need this shell. Matching `instanceId` required; after close, forget this id (new Execute = new session).
+                **Rare operation.** Keep shell open by default.
+                Close only when user explicitly asks, or when all shell work is finished and no further Execute is needed.
+                Not for routine end-of-turn cleanup. After close, treat the id as ended (next Execute starts/replaces session).
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "Active session id to close.", null, true),

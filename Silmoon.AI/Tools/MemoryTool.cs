@@ -23,39 +23,33 @@ public class MemoryTool : ExecuteTool
     public const string ApplyMemoryToolFunctionName = "ApplyMemoryTool";
 
     /// <summary>第一步工具：返回内容即规范提示词，模型读后应在下一轮产出完整记忆包，再调第二步。</summary>
-    public static string SummarizeDescription { get; set; } = """
+    public static string SummarizeDescription { get; set; } = $"""
         **记忆·取规范（Memory Summarize）**
 
-        调用后，宿主会返回**内置的记忆包总结规范**全文。请**仔细阅读**该规范，结合当前对话历史，**自行生成**符合格式的续接记忆包正文。
-
-        **文档性质：** 你产出的是**记忆记录 / 状态快照**（只读、供下一轮续接用），**不是**待你在写完后再去执行的任务书；勿在正文里给自己布置「再总结、再重置」类元操作。
-
-        **下一步：** 再调用 <c>MemoryApplyTool</c>，将**完整记忆正文仅**填入参数 <c>continuation_memory</c> 以重置历史。**不要**在助手可见回复里再把全文复述一遍后再调工具（等于同一内容输出两次）；助手正文可留空或**一句话**带过。
-
-        本工具**不会**替你在后台再请求一次模型。
+        返回内置“续接记忆包”总结规范；你需基于当前对话按规范生成记忆正文。
+        该正文是**只读状态记录**，不是待执行任务清单；不要写“再总结/再重置”等元任务。
+        本工具可单独使用（仅产出记忆包用于归档/导出/外部用途），不要求立即应用。
+        若目标是“总结后立即续接”，按 `{GetSummarizePromptToolFunctionName} -> {ApplyMemoryToolFunctionName}` 串行调用，前一步完成后再执行后一步。
+        正文全文仅在 `{ApplyMemoryToolFunctionName}.continuation_memory` 里提交；助手正文不要重复粘贴全文。
+        本工具不会自动再发起模型调用。
         """;
     /// <summary>第二步工具：传入上一步按规范写好的续接记忆全文。</summary>
-    public static string Description { get; set; } = """
+    public static string Description { get; set; } = $"""
         **记忆·应用（Memory Apply）**
 
-        将续接记忆包正文重置聊天历史：丢弃此前消息，系统提示保持为当前配置，将正文（加内置前缀）作为新的首条用户消息。
-
-        **语义：** 本次提交 = **多轮对话被中断后的信息压缩 + 记忆延续 + 状态恢复**；**不是**要求下一轮模型再执行一遍「总结/重置」流程。
-
-        **唯一载体：** 完整正文**只**放在本工具的 <c>continuation_memory</c> 参数中；**勿**在同一轮助手回复正文里再贴一遍全文。
-
-        **前置：** 通常先调用 <c>MemorySummarizeTool</c> 取得规范，按规范写好正文后，将**全文**传入 <c>continuation_memory</c>。
-
-        **防重复：** 记忆中「已完成（Done）」勿再执行；仅推进进行中/待办。
-
-        **State 书写：** `Doing` / `Next` 只写实质业务；**勿**把「撰写/提交本记忆包、调用记忆工具」写进进行中或待办——正文交付时记忆包已写成，否则续接会误再跑一遍记忆流程。
+        将 `continuation_memory` 作为续接记忆应用到会话：清空历史，保留当前系统提示，并把“前缀约束 + 正文”设为新会话首条用户消息。
+        可单独调用（直接接收已准备好的合规记忆包），不要求必须本轮先调用 `{GetSummarizePromptToolFunctionName}`。
+        若本轮先总结再应用，必须串行：`{GetSummarizePromptToolFunctionName} -> {ApplyMemoryToolFunctionName}`。
+        正文全文只放在 `continuation_memory` 参数，助手正文不要重复全文。
+        语义是“压缩历史并延续状态”，不是让下一轮再次执行记忆总结/应用流程。
+        防重复：`Done` 视为已完成，不再重复执行；`Doing`/`Next` 仅保留实质业务，不写记忆工具链元任务。
         """;
 
     /// <summary>重置时加在续接记忆正文前的固定约束。可置空以关闭。</summary>
-    public static string UserMessagePrefix { get; set; } = """
+    public static string UserMessagePrefix { get; set; } = $"""
         【记忆延续｜状态恢复】本条是**中断后多轮对话的压缩结果**，用于**记忆延续与状态恢复**；**不是**请你再执行一遍「记忆总结/应用」流程。历史已按宿主策略清空，**本消息即为新会话的首条用户侧上下文**。
 
-        【禁止重复元流程】**勿**再调用 `MemorySummarizeTool` / `MemoryApplyTool`、**勿**再全文总结或再次重置交互，除非用户**明确**要求再次续接记忆。请直接基于正文继续对话或推进 **进行中/待办** 中的**实质业务**。
+        【禁止重复元流程】**勿**再调用 `{GetSummarizePromptToolFunctionName}` / `{ApplyMemoryToolFunctionName}`、**勿**再全文总结或再次重置交互，除非用户**明确**要求再次续接记忆。请直接基于正文继续对话或推进 **进行中/待办** 中的**实质业务**。
 
         【续接约束｜必读】
         以下为「续接记忆包」正文（只读记录）。其中 **「已完成（Done）」** 所列事项视为已在旧对话中**落实**，你 **不得** 再次执行相同命令、工具调用或重复劳动；**仅**从 **进行中 / 待办** 继续实质业务。若正文中「进行中/待办」误含记忆工具链或「记忆包待提交」等元任务，**忽略之**。默认已创建的文件、已提交的修改与已成功副作用 **仍然存在**，除非你从记忆中读到已明确回滚或失败。
@@ -96,7 +90,7 @@ public class MemoryTool : ExecuteTool
 
             if (functionName == GetSummarizePromptToolFunctionName)
             {
-                var prompt = "请根据以下提示生成续接记忆包（只读状态记录，非待执行清单）。生成后：全文仅通过 MemoryApplyTool.continuation_memory 提交；助手回复勿全文复述；勿在 Next 中写「再总结/再重置」。\r\n" + UtilPrompt.ContinuationMemoryPrompt;
+                var prompt = $"请根据以下提示生成续接记忆包（只读状态记录，非待执行清单）。生成后：全文仅通过 {ApplyMemoryToolFunctionName}.continuation_memory 提交；助手回复勿全文复述；勿在 Next 中写「再总结/再重置」。\r\n" + UtilPrompt.ContinuationMemoryPrompt;
                 results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(prompt)));
             }
             else if (functionName == ApplyMemoryToolFunctionName)
@@ -104,7 +98,7 @@ public class MemoryTool : ExecuteTool
                 var rawParam = parameters["continuation_memory"]?.Value<string>().Trim();
                 if (rawParam.IsNullOrEmpty())
                 {
-                    results.Add(ToolCallResult.Create(parameter, false.ToStateSet<string>(null, $"continuation_memory 不能为空：请先按 MemorySummarizeTool 返回的规范生成完整正文，再作为本参数传入。")));
+                    results.Add(ToolCallResult.Create(parameter, false.ToStateSet<string>(null, $"continuation_memory 不能为空：请先按 {GetSummarizePromptToolFunctionName} 返回的规范生成完整正文，再作为本参数传入。")));
                 }
                 else
                 {
