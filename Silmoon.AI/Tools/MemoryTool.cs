@@ -60,8 +60,6 @@ public class MemoryTool : ExecuteTool
 
     public INativeChatClient NativeChatClient { get; set; }
 
-    public Tool[] Tools => throw new NotImplementedException();
-
     public MemoryTool(INativeChatClient nativeChatClient)
     {
         NativeChatClient = nativeChatClient;
@@ -115,10 +113,5 @@ public class MemoryTool : ExecuteTool
         }
 
         return Task.FromResult(results);
-    }
-
-    public void InjectToolCall(INativeChatClient nativeChatClient)
-    {
-        throw new NotImplementedException();
     }
 }

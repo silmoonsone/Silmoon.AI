@@ -5,7 +5,7 @@ using System;
 
 namespace Silmoon.AI.Models.OpenAI.Interfaces;
 
-public interface INativeChatClient
+public interface INativeChatClient : IDisposable
 {
     event ToolCallStartHandler OnToolCallStart;
     event ToolCallCompletedHandler OnToolCallCompleted;

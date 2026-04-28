@@ -262,4 +262,17 @@ public class NativeChatClient : INativeChatClient
             return [ToolCallResult.Create(null, false.ToStateSet<string>(null, $"执行工具调用发生异常: {ex.Message}"))];
         }
     }
+
+    public void Dispose()
+    {
+        OnToolCallStart = null;
+        OnToolCallCompleted = null;
+        OnStreamOutput = null;
+        OnStreamOutputCompleted = null;
+        Tools.Clear();
+        Tools = null;
+        MessageHistory.Clear();
+        MessageHistory = null;
+        HttpClient.Dispose();
+    }
 }

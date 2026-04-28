@@ -42,7 +42,6 @@ public class WaitTool : ExecuteTool
     public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
     {
         List<ToolCallResult> results = [];
-
         foreach (var parameter in toolCallParameters)
         {
             var functionName = parameter.FunctionName;
@@ -57,10 +56,9 @@ public class WaitTool : ExecuteTool
                 }
                 else
                 {
-                    int ms;
                     try
                     {
-                        ms = token.Type == JTokenType.Integer ? token.Value<int>() : (int)Math.Round(token.Value<double>());
+                        int ms = token.Type == JTokenType.Integer ? token.Value<int>() : (int)Math.Round(token.Value<double>());
                         if (ms < MinDurationMs) ms = MinDurationMs;
                         if (ms > MaxDurationMs) ms = MaxDurationMs;
 
