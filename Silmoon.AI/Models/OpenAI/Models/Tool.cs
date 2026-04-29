@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using Newtonsoft.Json;
+using Silmoon.Extensions;
 
 namespace Silmoon.AI.Models.OpenAI.Models;
 
@@ -83,9 +84,19 @@ public class ToolParameterProperty
     [JsonIgnore]
     public bool IsRequired { get; set; }
 
+    private static string NormalizeJsonSchemaType(string type)
+    {
+        if (type.IsNullOrEmpty()) return "string";
+        return type.ToLowerInvariant() switch
+        {
+            "bool" => "boolean",
+            _ => type
+        };
+    }
+
     public ToolParameterProperty(string type, string name, string description, List<object> @enum = null, bool isRequired = false)
     {
-        Type = type;
+        Type = NormalizeJsonSchemaType(type);
         Name = name;
         Description = description;
         Enum = @enum;
