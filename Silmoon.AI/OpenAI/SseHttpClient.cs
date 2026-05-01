@@ -16,17 +16,26 @@ public class SseHttpClient : HttpClient
         MissingMemberHandling = MissingMemberHandling.Ignore,
     };
 
-    public SseHttpClient() : base(new HttpClientHandler { UseProxy = false, Proxy = null })
+    public SseHttpClient(int? requestTimeoutMilliseconds = null) : base(new HttpClientHandler { UseProxy = false, Proxy = null })
     {
-
+        ApplyRequestTimeout(requestTimeoutMilliseconds);
     }
-    public SseHttpClient(bool disableProxy) : base(new HttpClientHandler { UseProxy = !disableProxy, Proxy = null })
-    {
 
+    public SseHttpClient(bool disableProxy, int? requestTimeoutMilliseconds = null) : base(new HttpClientHandler { UseProxy = !disableProxy, Proxy = null })
+    {
+        ApplyRequestTimeout(requestTimeoutMilliseconds);
     }
-    public SseHttpClient(HttpClientHandler httpClientHandler) : base(httpClientHandler)
-    {
 
+    public SseHttpClient(HttpClientHandler httpClientHandler, int? requestTimeoutMilliseconds = null) : base(httpClientHandler)
+    {
+        ApplyRequestTimeout(requestTimeoutMilliseconds);
+    }
+
+    void ApplyRequestTimeout(int? requestTimeoutMilliseconds)
+    {
+        if (!requestTimeoutMilliseconds.HasValue) return;
+        int ms = requestTimeoutMilliseconds.Value;
+        Timeout = ms < 0 ? System.Threading.Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(ms);
     }
 
     public async Task<StateSet<bool, Response>> CompletionsAsync(string url, Request request)

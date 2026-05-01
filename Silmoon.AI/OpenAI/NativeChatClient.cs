@@ -22,6 +22,7 @@ public class NativeChatClient : INativeChatClient
     public ModelProvider ModelProvider { get; set; }
     public string ModelName { get; set; }
     SseHttpClient HttpClient { get; set; }
+
     public bool EnableThinking { get; set; } = false;
     public bool EnableSearch { get; set; } = false;
     public List<MessageContent> MessageHistory { get; set; } = [];
@@ -45,27 +46,28 @@ public class NativeChatClient : INativeChatClient
     }
     public List<Tool> Tools { get; set; } = [];
 
-    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false)
+    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
     {
         ModelProvider = provider;
         ModelName = modelName;
         SystemPrompt = systemPrompt;
 
-        BuildHttpClient();
+        BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null, bool disableProxy = false)
+
+    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
     {
         ModelProvider = ModelProvider.Create(apiUrl, apiKey, modelName);
         ModelName = modelName;
         SystemPrompt = systemPrompt;
 
-        BuildHttpClient();
+        BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
 
-    void BuildHttpClient(bool disableProxy = false)
+    void BuildHttpClient(bool disableProxy, int? httpRequestTimeoutMilliseconds)
     {
         HttpClient?.Dispose();
-        HttpClient = new SseHttpClient(disableProxy);
+        HttpClient = new SseHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
     public void ResetHistory(string continuation = null)
