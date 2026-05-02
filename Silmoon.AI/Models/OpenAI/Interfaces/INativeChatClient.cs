@@ -1,4 +1,4 @@
-using Silmoon.AI.Handlers;
+﻿using Silmoon.AI.Handlers;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Models;
 using System;
@@ -14,6 +14,7 @@ public interface INativeChatClient : IDisposable
     string SystemPrompt { get; set; }
     List<Tool> Tools { get; set; }
     List<MessageContent> MessageHistory { get; set; }
+    ExecuteToolManager ExecuteToolManager { get; set; }
 
     /// <summary>
     /// 重置消息历史：无续接正文时仅保留当前 <see cref="SystemPrompt"/> 对应的一条 System（若无 System 则整表清空）；有正文时再追加一条 User。

@@ -22,6 +22,7 @@ public class NativeChatClient : INativeChatClient
     public ModelProvider ModelProvider { get; set; }
     public string ModelName { get; set; }
     SseHttpClient HttpClient { get; set; }
+    public ExecuteToolManager ExecuteToolManager { get; set; }
 
     public bool EnableThinking { get; set; } = false;
     public bool EnableSearch { get; set; } = false;
@@ -51,17 +52,12 @@ public class NativeChatClient : INativeChatClient
         ModelProvider = provider;
         ModelName = modelName;
         SystemPrompt = systemPrompt;
+        ExecuteToolManager = new ExecuteToolManager(this);
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-
-    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, modelName), modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds)
     {
-        ModelProvider = ModelProvider.Create(apiUrl, apiKey, modelName);
-        ModelName = modelName;
-        SystemPrompt = systemPrompt;
-
-        BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
 
     void BuildHttpClient(bool disableProxy, int? httpRequestTimeoutMilliseconds)
@@ -149,7 +145,7 @@ public class NativeChatClient : INativeChatClient
                     if (!result.ToolCalls.IsNullOrEmpty())
                     {
                         ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(result.ToolCalls);
-                        var toolCallResults = await ToolCalls(toolCallParameters);
+                        var toolCallResults = await ExecuteToolManager.ToolCalls(toolCallParameters, OnToolCallStart, OnToolCallCompleted);
 
                         if (toolCallParameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                         {
@@ -206,7 +202,7 @@ public class NativeChatClient : INativeChatClient
                 if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
                 {
                     ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(firstChoice?.Message?.ToolCalls);
-                    var toolCallResults = await ToolCalls(toolCallParameters);
+                    var toolCallResults = await ExecuteToolManager.ToolCalls(toolCallParameters, OnToolCallStart, OnToolCallCompleted);
 
                     if (toolCallParameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                     {
@@ -227,43 +223,6 @@ public class NativeChatClient : INativeChatClient
     }
 
 
-    async Task<List<ToolCallResult>> ToolCalls(ToolCallParameter[] toolCallParameters)
-    {
-        try
-        {
-            ConcurrentDictionary<string, ToolCallResult> results = [];
-            List<Task> handlerTasks = [];
-            foreach (ToolCallStartHandler handler in OnToolCallStart.GetInvocationList().Cast<ToolCallStartHandler>())
-            {
-                handlerTasks.Add(Task.Run(async () =>
-                {
-                    var toolCallResults = await handler(toolCallParameters, results);
-                    if (toolCallResults is not null)
-                    {
-                        foreach (var item in toolCallResults)
-                        {
-                            results[item.Parameter.ToolCallId] = item;
-                        }
-                    }
-                }));
-            }
-            await Task.WhenAll([.. handlerTasks]);
-
-            foreach (var item in toolCallParameters)
-            {
-                if (!results.ContainsKey(item.ToolCallId))
-                {
-                    results[item.ToolCallId] = ToolCallResult.Create(item, false.ToStateSet<string>(null, $"function {item.FunctionName} not implemented."));
-                }
-            }
-            results = await (OnToolCallCompleted?.Invoke(results) ?? Task.FromResult(results));
-            return [.. results.Values];
-        }
-        catch (Exception ex)
-        {
-            return [ToolCallResult.Create(null, false.ToStateSet<string>(null, $"执行工具调用发生异常: {ex.Message}"))];
-        }
-    }
 
     public void Dispose()
     {
