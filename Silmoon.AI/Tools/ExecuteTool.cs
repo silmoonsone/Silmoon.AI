@@ -14,7 +14,7 @@ namespace Silmoon.AI.Tools
     public abstract class ExecuteTool : IExecuteTool
     {
         public Tool[] Tools { get; set; } = [];
-
+        INativeChatClient NativeChatClient { get; set; }
         protected ExecuteTool()
         {
             Tools = GetTools();
@@ -22,18 +22,13 @@ namespace Silmoon.AI.Tools
         public abstract Tool[] GetTools();
         public virtual void InjectToolCall(INativeChatClient nativeChatClient)
         {
-            nativeChatClient.Tools.AddRange(Tools);
-            nativeChatClient.OnToolCallStart += OnToolCallInvoke;
+            NativeChatClient = nativeChatClient;
+            NativeChatClient.Tools.AddRange(Tools);
+            NativeChatClient.OnToolCallStart += OnToolCallInvoke;
         }
 
-        public async Task NotifyToolExecuting(ToolCallParameter toolCallParameter)
-        {
-
-        }
-        public async Task NotifyToolExecuted(ToolCallResult toolCallResult)
-        {
-
-        }
+        public async Task NotifyToolExecuting(ToolCallParameter toolCallParameter) => NativeChatClient.ExecuteToolManager.onToolCallExecuting(toolCallParameter);
+        public async Task NotifyToolExecuted(ToolCallResult toolCallResult) => NativeChatClient.ExecuteToolManager.onToolCallExecuted(toolCallResult);
 
         public abstract Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
     }

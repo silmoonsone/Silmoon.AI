@@ -13,6 +13,8 @@ namespace Silmoon.AI
 {
     public class ExecuteToolManager
     {
+        public event ToolExecutingHandler OnToolCallExecuting;
+        public event ToolExecutedHandler OnToolCallExecuted;
         public List<IExecuteTool> Tools { get; private set; } = [];
         INativeChatClient NativeChatClient { get; set; }
         public ExecuteToolManager(INativeChatClient nativeChatClient)
@@ -30,6 +32,8 @@ namespace Silmoon.AI
             Tools.Add(tool);
             return true.ToStateSet(tool);
         }
+        internal void onToolCallExecuting(ToolCallParameter toolCallParameter) => OnToolCallExecuting?.Invoke(toolCallParameter);
+        internal void onToolCallExecuted(ToolCallResult toolCallResult) => OnToolCallExecuted?.Invoke(toolCallResult);
         public void AddExecuteTools(IExecuteTool[] tools) => tools.Each(x => AddExecuteTool(x));
         public async Task<ToolCallResult[]> ToolCalls(ToolCallParameter[] toolCallParameters, ToolCallStartHandler toolCallStartHandler, ToolCallCompletedHandler toolCallCompletedHandler)
         {
@@ -44,7 +48,11 @@ namespace Silmoon.AI
                         List<Task> handlerTasks = [];
                         foreach (ToolCallStartHandler handler in toolCallStartHandler.GetInvocationList().Cast<ToolCallStartHandler>())
                         {
-                            handlerTasks.Add(Task.Run(async () => { result = await handler(toolCallParameter, result); }));
+                            handlerTasks.Add(Task.Run(async () =>
+                            {
+                                var tmpResult = await handler(toolCallParameter, result);
+                                result ??= tmpResult;
+                            }));
                         }
                         await Task.WhenAll([.. handlerTasks]);
                         result ??= ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"function {toolCallParameter.FunctionName} not implemented."));
