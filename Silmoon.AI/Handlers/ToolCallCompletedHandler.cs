@@ -8,5 +8,5 @@ using System.Text;
 
 namespace Silmoon.AI.Handlers
 {
-    public delegate Task<ConcurrentDictionary<string, ToolCallResult>> ToolCallCompletedHandler(ConcurrentDictionary<string, ToolCallResult> toolCallResults);
+    public delegate Task<ToolCallResult> ToolCallCompletedHandler(ToolCallResult toolCallResult);
 }

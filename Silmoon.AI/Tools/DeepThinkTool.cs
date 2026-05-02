@@ -36,51 +36,46 @@ namespace Silmoon.AI.Tools
                 ]),
             ];
         }
-        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
+        public override async Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
         {
-            List<ToolCallResult> results = [];
+            ToolCallResult result = null;
 
-            foreach (var parameter in toolCallParameters)
+            var functionName = toolCallParameter.FunctionName;
+            var parameters = toolCallParameter.Parameters;
+
+            if (functionName == "ask")
             {
-                var functionName = parameter.FunctionName;
-                var parameters = parameter.Parameters;
+                string system = parameters["system"]?.ToString();
+                string content = parameters["content"].ToString();
+                //bool reasonContent = parameters["reasonContent"]?.Value<bool>() ?? false;
 
-                if (functionName == "ask")
+                if (system is not null) NativeChatClient.SystemPrompt = system;
+
+                List<Chunk> chunks = [];
+                Console.WriteLineWithColor("Agent response start:", ConsoleColor.Green, ConsoleColor.Blue);
+                await foreach (var chunk in NativeChatClient.CompletionsStreamAsync([MessageContent.Create(Role.User, content)], chunks))
                 {
-                    string system = parameters["system"]?.ToString();
-                    string content = parameters["content"].ToString();
-                    //bool reasonContent = parameters["reasonContent"]?.Value<bool>() ?? false;
-
-                    if (system is not null) NativeChatClient.SystemPrompt = system;
-
-                    List<Chunk> chunks = [];
-                    Console.WriteLineWithColor("Agent response start:", ConsoleColor.Green, ConsoleColor.Blue);
-                    await foreach (var chunk in NativeChatClient.CompletionsStreamAsync([MessageContent.Create(Role.User, content)], chunks))
+                    if (chunk.State)
                     {
-                        if (chunk.State)
+                        chunk.Data.Choices.Each(x =>
                         {
-                            chunk.Data.Choices.Each(x =>
+                            if (x.Delta?.ToolCalls is not null) Console.Write(".");
+                            else
                             {
-                                if (x.Delta?.ToolCalls is not null) Console.Write(".");
-                                else
-                                {
-                                    Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.DarkGray);
-                                    Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
-                                }
-                            });
-                        }
-                        else Console.WriteLineWithColor(chunk.Message);
+                                Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.DarkGray);
+                                Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
+                            }
+                        });
                     }
-                    Console.WriteLine();
-                    Console.WriteLineWithColor("Agent response end:", ConsoleColor.Green, ConsoleColor.Blue);
-                    var result = Result.Create([.. chunks]);
-
-                    results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(result.ToJsonString())));
-                    break;
+                    else Console.WriteLineWithColor(chunk.Message);
                 }
+                Console.WriteLine();
+                Console.WriteLineWithColor("Agent response end:", ConsoleColor.Green, ConsoleColor.Blue);
+                var askResult = Result.Create([.. chunks]);
+                result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(askResult.ToJsonString()));
             }
 
-            return results;
+            return result;
         }
     }
 }

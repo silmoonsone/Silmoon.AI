@@ -34,7 +34,7 @@ namespace Silmoon.AI.Tools
         static readonly ConcurrentDictionary<string, DateTimeOffset> SessionClosedIntentionallyAt = new();
         const double TombstoneRetentionHours = 168; // 7 天后遗忘，避免字典无限增长
 
-        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults) => await ToolCall(toolCallParameters, toolCallResults);
+        public override async Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await ToolCall(toolCallParameter, toolCallResult);
 
 
         public override Tool[] GetTools()
@@ -103,61 +103,58 @@ namespace Silmoon.AI.Tools
         /// <summary>
         /// 分发 <see cref="GetTools"/> 中注册的 <c>CommandTool</c>（无状态）与 <c>StatefulCommandExecuteTool*</c>（有状态）工具；有状态实现对应 <c>ExecuteCommand</c> / <c>GetCommandOutput</c> / <c>GetShellSessionStatus</c> / <c>CloseCommand</c>。
         /// </summary>
-        public static Task<List<ToolCallResult>> ToolCall(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
+        public static Task<ToolCallResult> ToolCall(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
         {
-            List<ToolCallResult> results = [];
+            ToolCallResult result = null;
 
-            foreach (var parameter in toolCallParameters)
+            var functionName = toolCallParameter.FunctionName;
+            var parameters = toolCallParameter.Parameters;
+
+            switch (functionName)
             {
-                var functionName = parameter.FunctionName;
-                var parameters = parameter.Parameters;
-
-                switch (functionName)
-                {
-                    case "CommandTool":
-                        try
-                        {
-                            var osN = NormalizeOs(parameters["os"]?.Value<string>());
-                            var ttN = NormalizeTerminal(parameters["terminalType"]?.Value<string>(), osN);
-                            var outText = Execute(osN, parameters["command"]?.Value<string>() ?? string.Empty, ttN);
-                            results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(outText)));
-                        }
-                        catch (Exception ex)
-                        {
-                            results.Add(ToolCallResult.Create(parameter, false.ToStateSet<string>(null, $"[CommandTool] {ex.Message}")));
-                        }
-                        break;
-                    case "StatefulCommandExecuteTool":
-                        var timeoutToken = parameters["timeoutMilliseconds"];
-                        int timeoutMs = timeoutToken is null || timeoutToken.Type == JTokenType.Null ? 30_000 : timeoutToken.Value<int>();
-                        var shellExecResult = ExecuteCommand(
-                            parameters["instanceId"]?.Value<string>() ?? string.Empty,
-                            parameters["os"]?.Value<string>() ?? string.Empty,
-                            parameters["command"]?.Value<string>() ?? string.Empty,
-                            parameters["terminalType"]?.Value<string>() ?? string.Empty,
-                            timeoutMs);
-                        results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(shellExecResult)));
-                        break;
-                    case "StatefulCommandGetOutputTool":
-                        var waitOutToken = parameters["waitMilliseconds"];
-                        int waitBeforeReadMs = waitOutToken is null || waitOutToken.Type == JTokenType.Null ? 0 : waitOutToken.Value<int>();
-                        if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
-                        if (waitBeforeReadMs > 180_000) waitBeforeReadMs = 180_000;
-                        var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
-                        results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(shellPollResult)));
-                        break;
-                    case "StatefulCommandGetSessionStatusTool":
-                        results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty))));
-                        break;
-                    case "StatefulCommandCloseTool":
-                        CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
-                        results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>("StatefulCommandCloseTool: session closed.")));
-                        break;
-                    default:
-                        break;
-                }
+                case "CommandTool":
+                    try
+                    {
+                        var osN = NormalizeOs(parameters["os"]?.Value<string>());
+                        var ttN = NormalizeTerminal(parameters["terminalType"]?.Value<string>(), osN);
+                        var outText = Execute(osN, parameters["command"]?.Value<string>() ?? string.Empty, ttN);
+                        result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(outText));
+                    }
+                    catch (Exception ex)
+                    {
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"[CommandTool] {ex.Message}"));
+                    }
+                    break;
+                case "StatefulCommandExecuteTool":
+                    var timeoutToken = parameters["timeoutMilliseconds"];
+                    int timeoutMs = timeoutToken is null || timeoutToken.Type == JTokenType.Null ? 30_000 : timeoutToken.Value<int>();
+                    var shellExecResult = ExecuteCommand(
+                        parameters["instanceId"]?.Value<string>() ?? string.Empty,
+                        parameters["os"]?.Value<string>() ?? string.Empty,
+                        parameters["command"]?.Value<string>() ?? string.Empty,
+                        parameters["terminalType"]?.Value<string>() ?? string.Empty,
+                        timeoutMs);
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(shellExecResult));
+                    break;
+                case "StatefulCommandGetOutputTool":
+                    var waitOutToken = parameters["waitMilliseconds"];
+                    int waitBeforeReadMs = waitOutToken is null || waitOutToken.Type == JTokenType.Null ? 0 : waitOutToken.Value<int>();
+                    if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
+                    if (waitBeforeReadMs > 180_000) waitBeforeReadMs = 180_000;
+                    var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(shellPollResult));
+                    break;
+                case "StatefulCommandGetSessionStatusTool":
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty)));
+                    break;
+                case "StatefulCommandCloseTool":
+                    CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>("StatefulCommandCloseTool: session closed."));
+                    break;
+                default:
+                    break;
             }
-            return Task.FromResult(results);
+            return Task.FromResult(result);
         }
 
         /// <summary>大小写不敏感：按小写分支，返回规范常量。</summary>

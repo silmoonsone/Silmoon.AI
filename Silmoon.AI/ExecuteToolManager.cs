@@ -31,42 +31,34 @@ namespace Silmoon.AI
             return true.ToStateSet(tool);
         }
         public void AddExecuteTools(IExecuteTool[] tools) => tools.Each(x => AddExecuteTool(x));
-        public async Task<List<ToolCallResult>> ToolCalls(ToolCallParameter[] toolCallParameters, ToolCallStartHandler toolCallStartHandler, ToolCallCompletedHandler toolCallCompletedHandler)
+        public async Task<ToolCallResult[]> ToolCalls(ToolCallParameter[] toolCallParameters, ToolCallStartHandler toolCallStartHandler, ToolCallCompletedHandler toolCallCompletedHandler)
         {
-            try
+            List<Task<ToolCallResult>> toolCallTasks = [];
+            foreach (var toolCallParameter in toolCallParameters)
             {
-                ConcurrentDictionary<string, ToolCallResult> results = [];
-                List<Task> handlerTasks = [];
-                foreach (ToolCallStartHandler handler in toolCallStartHandler.GetInvocationList().Cast<ToolCallStartHandler>())
+                toolCallTasks.Add(Task.Run(async () =>
                 {
-                    handlerTasks.Add(Task.Run(async () =>
+                    ToolCallResult result = null;
+                    try
                     {
-                        var toolCallResults = await handler(toolCallParameters, results);
-                        if (toolCallResults is not null)
+                        List<Task> handlerTasks = [];
+                        foreach (ToolCallStartHandler handler in toolCallStartHandler.GetInvocationList().Cast<ToolCallStartHandler>())
                         {
-                            foreach (var item in toolCallResults)
-                            {
-                                results[item.Parameter.ToolCallId] = item;
-                            }
+                            handlerTasks.Add(Task.Run(async () => { result = await handler(toolCallParameter, result); }));
                         }
-                    }));
-                }
-                await Task.WhenAll([.. handlerTasks]);
-
-                foreach (var item in toolCallParameters)
-                {
-                    if (!results.ContainsKey(item.ToolCallId))
-                    {
-                        results[item.ToolCallId] = ToolCallResult.Create(item, false.ToStateSet<string>(null, $"function {item.FunctionName} not implemented."));
+                        await Task.WhenAll([.. handlerTasks]);
+                        result ??= ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"function {toolCallParameter.FunctionName} not implemented."));
+                        result = await (toolCallCompletedHandler?.Invoke(result) ?? Task.FromResult(result));
                     }
-                }
-                results = await (toolCallCompletedHandler?.Invoke(results) ?? Task.FromResult(results));
-                return [.. results.Values];
+                    catch (Exception ex)
+                    {
+                        result = ToolCallResult.Create(null, false.ToStateSet<string>(null, $"执行工具调用发生异常: {ex.Message}"));
+                    }
+                    return result;
+                }));
             }
-            catch (Exception ex)
-            {
-                return [ToolCallResult.Create(null, false.ToStateSet<string>(null, $"执行工具调用发生异常: {ex.Message}"))];
-            }
+            var results = await Task.WhenAll(toolCallTasks);
+            return results;
         }
     }
 }

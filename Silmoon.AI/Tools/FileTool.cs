@@ -9,13 +9,14 @@ using Silmoon.Models;
 using System;
 using System.Collections.Concurrent;
 using System.Collections.Generic;
+using System.Reflection.Metadata;
 using System.Text;
 
 namespace Silmoon.AI.Tools
 {
     public class FileTool : ExecuteTool
     {
-        public override async Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults) => await CallTool(toolCallParameters, toolCallResults);
+        public override async Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await CallTool(toolCallParameter, toolCallResult);
         public override Tool[] GetTools()
         {
             return [
@@ -35,26 +36,23 @@ namespace Silmoon.AI.Tools
         }
 
 
-        public static Task<List<ToolCallResult>> CallTool(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
+        public static Task<ToolCallResult> CallTool(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
         {
-            List<ToolCallResult> results = [];
+            ToolCallResult result = null;
 
-            foreach (var parameter in toolCallParameters)
+            var functionName = toolCallParameter.FunctionName;
+            var parameters = toolCallParameter.Parameters;
+
+            switch (functionName)
             {
-                var functionName = parameter.FunctionName;
-                var parameters = parameter.Parameters;
-
-                switch (functionName)
-                {
-                    case "FileTool":
-                        var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
-                        results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(fileSystemResult.ToJsonString())));
-                        break;
-                    default:
-                        break;
-                }
+                case "FileTool":
+                    var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(fileSystemResult.ToJsonString()));
+                    break;
+                default:
+                    break;
             }
-            return Task.FromResult(results);
+            return Task.FromResult(result);
         }
 
         static StateSet<bool, string> ExecuteTool(string action, string path, string content)

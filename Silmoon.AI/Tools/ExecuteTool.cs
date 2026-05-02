@@ -26,6 +26,15 @@ namespace Silmoon.AI.Tools
             nativeChatClient.OnToolCallStart += OnToolCallInvoke;
         }
 
-        public abstract Task<List<ToolCallResult>> OnToolCallInvoke(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults);
+        public async Task NotifyToolExecuting(ToolCallParameter toolCallParameter)
+        {
+
+        }
+        public async Task NotifyToolExecuted(ToolCallResult toolCallResult)
+        {
+
+        }
+
+        public abstract Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
     }
 }
