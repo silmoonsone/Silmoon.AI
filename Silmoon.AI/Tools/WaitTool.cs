@@ -49,7 +49,7 @@ public class WaitTool : ExecuteTool
 
         if (functionName == WaitFunctionName)
         {
-            await NotifyToolExecuting(toolCallParameter);
+            await NotifyToolExecuting(functionName, toolCallParameter);
             var token = parameters["durationMilliseconds"];
             if (token is null || token.Type == JTokenType.Null)
             {
@@ -78,7 +78,7 @@ public class WaitTool : ExecuteTool
                     result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, "durationMilliseconds must be a number."));
                 }
             }
-            await NotifyToolExecuted(result);
+            await NotifyToolExecuted(functionName, toolCallParameter, result);
         }
         return result;
     }

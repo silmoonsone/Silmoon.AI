@@ -1,5 +1,4 @@
-﻿using Silmoon.AI.Handlers;
-using Silmoon.AI.Models.OpenAI.Models;
+﻿using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Models;
 using System;
 
@@ -7,8 +6,14 @@ namespace Silmoon.AI.Models.OpenAI.Interfaces;
 
 public interface INativeChatClient : IDisposable
 {
-    event ToolCallStartHandler OnToolCallStart;
-    event ToolCallCompletedHandler OnToolCallCompleted;
+    event ToolCallsStartHandler OnToolCallsStart;
+    event ToolCallInvokeHandler OnToolCallInvoke;
+    event ToolExecutingHandler OnToolExecuting;
+    event ToolExecutedHandler OnToolExecuted;
+    event ToolCallsFinishHandler OnToolCallsFinish;
+    event StreamOutputHandler OnStreamOutput;
+    event StreamOutputCompletedHandler OnStreamOutputCompleted;
+
     ModelProvider ModelProvider { get; set; }
     string ModelName { get; set; }
     string SystemPrompt { get; set; }

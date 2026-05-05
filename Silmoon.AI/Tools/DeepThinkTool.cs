@@ -47,7 +47,7 @@ namespace Silmoon.AI.Tools
 
             if (functionName == CallAgentFunctionName)
             {
-                await NotifyToolExecuting(toolCallParameter);
+                await NotifyToolExecuting(functionName, toolCallParameter);
                 string system = parameters["system"]?.ToString();
                 string content = parameters["content"].ToString();
                 //bool reasonContent = parameters["reasonContent"]?.Value<bool>() ?? false;
@@ -76,7 +76,7 @@ namespace Silmoon.AI.Tools
                 Console.WriteLineWithColor("Agent response end:", ConsoleColor.Green, ConsoleColor.Blue);
                 var askResult = Result.Create([.. chunks]);
                 result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(askResult.ToJsonString()));
-                await NotifyToolExecuted(result);
+                await NotifyToolExecuted(functionName, toolCallParameter, result);
             }
 
             return result;

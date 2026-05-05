@@ -1,6 +1,5 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Silmoon.AI.Handlers;
 using Silmoon.AI.Models.OpenAI.Enums;
 using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
@@ -15,10 +14,13 @@ namespace Silmoon.AI.OpenAI;
 
 public class NativeChatClient : INativeChatClient
 {
-    public event ToolCallStartHandler OnToolCallStart;
-    public event ToolCallCompletedHandler OnToolCallCompleted;
-    public event StreamOutputCompletedHandler OnStreamOutputCompleted;
+    public event ToolCallsStartHandler OnToolCallsStart;
+    public event ToolCallInvokeHandler OnToolCallInvoke;
+    public event ToolExecutingHandler OnToolExecuting;
+    public event ToolExecutedHandler OnToolExecuted;
+    public event ToolCallsFinishHandler OnToolCallsFinish;
     public event StreamOutputHandler OnStreamOutput;
+    public event StreamOutputCompletedHandler OnStreamOutputCompleted;
     public ModelProvider ModelProvider { get; set; }
     public string ModelName { get; set; }
     SseHttpClient HttpClient { get; set; }
@@ -52,7 +54,14 @@ public class NativeChatClient : INativeChatClient
         ModelProvider = provider;
         ModelName = modelName;
         SystemPrompt = systemPrompt;
+
         ExecuteToolManager = new ExecuteToolManager(this);
+
+        ExecuteToolManager.OnToolCallsStart += async (toolCallParameters) => await (OnToolCallsStart is null ? Task.CompletedTask : OnToolCallsStart.Invoke(toolCallParameters));
+        ExecuteToolManager.OnToolCallInvoke += async (toolCallParameter, toolCallResult) => await (OnToolCallInvoke is null ? Task.FromResult(toolCallResult) : OnToolCallInvoke.Invoke(toolCallParameter, toolCallResult));
+        ExecuteToolManager.OnToolCallsFinish += async (toolCallParameters, toolCallResults) => await (OnToolCallsFinish is null ? Task.FromResult(toolCallResults) : OnToolCallsFinish.Invoke(toolCallParameters, toolCallResults));
+        ExecuteToolManager.OnToolExecuting += async (functionName, toolCallParameter) => await (OnToolExecuting is null ? Task.CompletedTask : OnToolExecuting.Invoke(functionName, toolCallParameter));
+        ExecuteToolManager.OnToolExecuted += async (functionName, toolCallParameter, toolCallResult) => await (OnToolExecuted is null ? Task.CompletedTask : OnToolExecuted.Invoke(functionName, toolCallParameter, toolCallResult));
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
@@ -145,7 +154,7 @@ public class NativeChatClient : INativeChatClient
                     if (!result.ToolCalls.IsNullOrEmpty())
                     {
                         ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(result.ToolCalls);
-                        var toolCallResults = await ExecuteToolManager.ToolCalls(toolCallParameters, OnToolCallStart, OnToolCallCompleted);
+                        var toolCallResults = await ExecuteToolManager.ToolCalls(toolCallParameters);
 
                         if (toolCallParameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                         {
@@ -202,7 +211,7 @@ public class NativeChatClient : INativeChatClient
                 if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
                 {
                     ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(firstChoice?.Message?.ToolCalls);
-                    var toolCallResults = await ExecuteToolManager.ToolCalls(toolCallParameters, OnToolCallStart, OnToolCallCompleted);
+                    var toolCallResults = await ExecuteToolManager.ToolCalls(toolCallParameters);
 
                     if (toolCallParameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                     {
@@ -223,13 +232,16 @@ public class NativeChatClient : INativeChatClient
     }
 
 
-
     public void Dispose()
     {
-        OnToolCallStart = null;
-        OnToolCallCompleted = null;
+        OnToolCallsStart = null;
+        OnToolCallInvoke = null;
+        OnToolCallsFinish = null;
+        OnToolExecuting = null;
+        OnToolExecuted = null;
         OnStreamOutput = null;
         OnStreamOutputCompleted = null;
+
         Tools.Clear();
         Tools = null;
         MessageHistory.Clear();

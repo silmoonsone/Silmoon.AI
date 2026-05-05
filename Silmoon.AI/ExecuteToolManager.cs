@@ -1,5 +1,4 @@
-﻿using Silmoon.AI.Handlers;
-using Silmoon.AI.Interfaces;
+﻿using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models;
 using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.Extensions;
@@ -13,8 +12,12 @@ namespace Silmoon.AI
 {
     public class ExecuteToolManager
     {
-        public event ToolExecutingHandler OnToolCallExecuting;
-        public event ToolExecutedHandler OnToolCallExecuted;
+        public event ToolCallsStartHandler OnToolCallsStart;
+        public event ToolCallInvokeHandler OnToolCallInvoke;
+        public event ToolCallsFinishHandler OnToolCallsFinish;
+
+        public event ToolExecutingHandler OnToolExecuting;
+        public event ToolExecutedHandler OnToolExecuted;
         public List<IExecuteTool> Tools { get; private set; } = [];
         INativeChatClient NativeChatClient { get; set; }
         public ExecuteToolManager(INativeChatClient nativeChatClient)
@@ -32,12 +35,13 @@ namespace Silmoon.AI
             Tools.Add(tool);
             return true.ToStateSet(tool);
         }
-        internal void onToolCallExecuting(ToolCallParameter toolCallParameter) => OnToolCallExecuting?.Invoke(toolCallParameter);
-        internal void onToolCallExecuted(ToolCallResult toolCallResult) => OnToolCallExecuted?.Invoke(toolCallResult);
+        internal Task onToolCallExecuting(string functionName, ToolCallParameter toolCallParameter) => OnToolExecuting is null ? Task.CompletedTask : OnToolExecuting(functionName, toolCallParameter);
+        internal Task onToolCallExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => OnToolExecuted is null ? Task.CompletedTask : OnToolExecuted(functionName, toolCallParameter, toolCallResult);
         public void AddExecuteTools(IExecuteTool[] tools) => tools.Each(x => AddExecuteTool(x));
-        public async Task<ToolCallResult[]> ToolCalls(ToolCallParameter[] toolCallParameters, ToolCallStartHandler toolCallStartHandler, ToolCallCompletedHandler toolCallCompletedHandler)
+        public async Task<ToolCallResult[]> ToolCalls(ToolCallParameter[] toolCallParameters)
         {
             List<Task<ToolCallResult>> toolCallTasks = [];
+            OnToolCallsStart?.Invoke(toolCallParameters);
             foreach (var toolCallParameter in toolCallParameters)
             {
                 toolCallTasks.Add(Task.Run(async () =>
@@ -46,17 +50,23 @@ namespace Silmoon.AI
                     try
                     {
                         List<Task> handlerTasks = [];
-                        foreach (ToolCallStartHandler handler in toolCallStartHandler.GetInvocationList().Cast<ToolCallStartHandler>())
+                        foreach (ToolCallInvokeHandler handler in OnToolCallInvoke.GetInvocationList().Cast<ToolCallInvokeHandler>())
                         {
                             handlerTasks.Add(Task.Run(async () =>
                             {
-                                var tmpResult = await handler(toolCallParameter, result);
-                                result ??= tmpResult;
+                                try
+                                {
+                                    var tmpResult = await handler(toolCallParameter, result);
+                                    result ??= tmpResult;
+                                }
+                                catch (Exception ex)
+                                {
+                                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"执行工具调用处理程序发生异常: {ex.Message}"));
+                                }
                             }));
                         }
                         await Task.WhenAll([.. handlerTasks]);
                         result ??= ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"function {toolCallParameter.FunctionName} not implemented."));
-                        result = await (toolCallCompletedHandler?.Invoke(result) ?? Task.FromResult(result));
                     }
                     catch (Exception ex)
                     {
@@ -66,6 +76,7 @@ namespace Silmoon.AI
                 }));
             }
             var results = await Task.WhenAll(toolCallTasks);
+            results = OnToolCallsFinish is null ? results : await OnToolCallsFinish(toolCallParameters, results);
             return results;
         }
     }

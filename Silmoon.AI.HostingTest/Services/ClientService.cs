@@ -25,9 +25,11 @@ public class ClientService : IHostedService
         ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.ApiUrl, SilmoonConfigureService.Key, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
-        NativeChatClient.OnToolCallStart += NativeChatClient_OnToolCallStart;
-        NativeChatClient.OnToolCallCompleted += NativeChatClient_OnToolCallCompleted;
-        NativeChatClient.OnStreamOutputCompleted += NativeChatClient_OnNativeClientChatFinished;
+        NativeChatClient.OnToolCallsStart += NativeChatClient_OnToolCallsStart;
+        NativeChatClient.OnToolExecuting += NativeChatClient_OnToolExecuting;
+        NativeChatClient.OnToolExecuted += NativeChatClient_OnToolExecuted;
+        NativeChatClient.OnToolCallsFinish += NativeChatClient_OnToolCallsFinish;
+        NativeChatClient.OnStreamOutputCompleted += NativeChatClient_OnStreamOutputCompleted;
         NativeChatClient.Tools.AddRange(makeTools());
         new FileTool().InjectToolCall(NativeChatClient);
         new CommandTool().InjectToolCall(NativeChatClient);
@@ -37,51 +39,41 @@ public class ClientService : IHostedService
         //NativeChatClient.EnableThinking = true;
     }
 
-    private async Task NativeChatClient_OnNativeClientChatFinished(Result result)
+    private async Task NativeChatClient_OnToolCallsStart(ToolCallParameter[] toolCallParameters)
+    {
+        Console.WriteLineWithColor($"[TOOL CALLS] {string.Join(',', toolCallParameters.Select(x => x.FunctionName))}", ConsoleColor.Yellow);
+    }
+    private Task NativeChatClient_OnToolExecuting(string functionName, ToolCallParameter toolCallParameter)
+    {
+        Console.WriteLineWithColor($"[Tool Executing] ({functionName}) is executing.", ConsoleColor.Cyan);
+        return Task.CompletedTask;
+    }
+    private Task NativeChatClient_OnToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
+    {
+        if (toolCallResult is not null)
+        {
+            if (toolCallResult.Result.State)
+                Console.WriteLineWithColor($"[Tool Executed] ({functionName}) executed with result: State: {toolCallResult.Result.State}, Message: {toolCallResult.Result.Message}", ConsoleColor.Cyan);
+            else
+                Console.WriteLineWithColor($"[Tool Executed] ({functionName}) executed with result: State: {toolCallResult.Result.State}, Message: {toolCallResult.Result.Message}", ConsoleColor.Red);
+        }
+        else
+            Console.WriteLineWithColor($"[Tool Executed] ({functionName}) executed with no any result", ConsoleColor.Red);
+        return Task.CompletedTask;
+    }
+    private Task<ToolCallResult[]> NativeChatClient_OnToolCallsFinish(ToolCallParameter[] toolCallParameters, ToolCallResult[] toolCallResults)
+    {
+        Console.WriteLineWithColor($"[TOOL CALLS RESULTS] {string.Join(", ", toolCallParameters.Select(x => $"{x.FunctionName}: {toolCallResults.FirstOrDefault(y => y.Parameter.FunctionName == x.FunctionName)?.Result.State}"))}", ConsoleColor.Yellow);
+        return Task.FromResult(toolCallResults);
+    }
+
+    private async Task NativeChatClient_OnStreamOutputCompleted(Result result)
     {
         Console.WriteLine();
         Console.WriteLine("stop reason: " + result.FinishReason);
         await Task.CompletedTask;
     }
 
-    private Task<ConcurrentDictionary<string, ToolCallResult>> NativeChatClient_OnToolCallCompleted(ConcurrentDictionary<string, ToolCallResult> toolCallResults)
-    {
-        foreach (var toolCallResult in toolCallResults.Values)
-        {
-            if (toolCallResult.Result.State) Console.WriteLineWithColor($"[TOOL RESULT] State: {toolCallResult.Result.State}, Message: {toolCallResult.Result.Message}", ConsoleColor.Cyan);
-            else Console.WriteLineWithColor($"[TOOL RESULT] State: {toolCallResult.Result.State}, Message: {toolCallResult.Result.Message}", ConsoleColor.Red);
-        }
-        return Task.FromResult(toolCallResults);
-    }
-    private async Task<List<ToolCallResult>> NativeChatClient_OnToolCallStart(ToolCallParameter[] toolCallParameters, ConcurrentDictionary<string, ToolCallResult> toolCallResults)
-    {
-        List<ToolCallResult> results = [];
-
-        foreach (var parameter in toolCallParameters)
-        {
-            var functionName = parameter.FunctionName;
-            var parameters = parameter.Parameters;
-
-            Console.WriteLine();
-            Console.WriteLineWithColor($"[TOOL CALL] {functionName}", ConsoleColor.Yellow);
-
-            switch (functionName)
-            {
-                case "QuoteTool":
-                    if (parameters["symbol"].Value<string>() == "XAUUSD")
-                        results.Add(ToolCallResult.Create(parameter, true.ToStateSet<string>(4800m.ToJsonString())));
-                    else
-                        results.Add(ToolCallResult.Create(parameter, false.ToStateSet<string>(null, $"产品符号 {parameters["symbol"].Value<string>()} 是错误的，我们接受的应该是国际通用的产品符号，并且没有斜杠分割（/），如果是大模型调用本函数，请尝试更正后自动再次发起查询，但是务必告知用户正确的符号。")));
-                    break;
-                case "TradingController":
-                    results.Add(ToolCallResult.Create(parameter, false.ToStateSet<string>(null, $"无法执行 {parameters["action"].Value<string>()} 操作，因为这是一个模拟调用。")));
-                    break;
-                default:
-                    break;
-            }
-        }
-        return await Task.FromResult(results);
-    }
 
     private List<Tool> makeTools()
     {

@@ -24,11 +24,11 @@ namespace Silmoon.AI.Tools
         {
             NativeChatClient = nativeChatClient;
             NativeChatClient.Tools.AddRange(Tools);
-            NativeChatClient.OnToolCallStart += OnToolCallInvoke;
+            NativeChatClient.ExecuteToolManager.OnToolCallInvoke += OnToolCallInvoke;
         }
 
-        public async Task NotifyToolExecuting(ToolCallParameter toolCallParameter) => NativeChatClient.ExecuteToolManager.onToolCallExecuting(toolCallParameter);
-        public async Task NotifyToolExecuted(ToolCallResult toolCallResult) => NativeChatClient.ExecuteToolManager.onToolCallExecuted(toolCallResult);
+        public async Task NotifyToolExecuting(string functionName, ToolCallParameter toolCallParameter) => await NativeChatClient.ExecuteToolManager.onToolCallExecuting(functionName, toolCallParameter);
+        public async Task NotifyToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await NativeChatClient.ExecuteToolManager.onToolCallExecuted(functionName, toolCallParameter, toolCallResult);
 
         public abstract Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
     }

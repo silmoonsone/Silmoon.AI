@@ -16,5 +16,7 @@ namespace Silmoon.AI.Interfaces
         Tool[] GetTools();
         void InjectToolCall(INativeChatClient nativeChatClient);
         Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
+        Task NotifyToolExecuting(string functionName, ToolCallParameter toolCallParameter);
+        Task NotifyToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
     }
 }
