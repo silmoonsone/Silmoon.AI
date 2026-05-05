@@ -16,6 +16,12 @@ namespace Silmoon.AI.Tools
 {
     public class CommandTool : ExecuteTool
     {
+        public const string CommandFunctionName = "Sys_Command";
+        public const string StatefulExecuteFunctionName = "Sys_StatefulCommandExecute";
+        public const string StatefulGetOutputFunctionName = "Sys_StatefulCommandGetOutput";
+        public const string StatefulGetSessionStatusFunctionName = "Sys_StatefulCommandGetSessionStatus";
+        public const string StatefulCloseFunctionName = "Sys_StatefulCommandClose";
+
         /// <summary>工具 schema 与内部逻辑使用的操作系统标识（大小写不敏感输入会归一化为此）。</summary>
         public const string OsWindows = "Windows";
         public const string OsMacOS = "MacOS";
@@ -40,7 +46,7 @@ namespace Silmoon.AI.Tools
         public override Tool[] GetTools()
         {
             return [
-                Tool.Create("CommandTool", """
+                Tool.Create(CommandFunctionName, $"""
                 **Stateless:** new process each call—no persistent cwd/env.
 
                 **Use for:** fast one-shot commands whose output is complete at process exit (single-line `&&`/`;` is OK).
@@ -57,7 +63,7 @@ namespace Silmoon.AI.Tools
                     new ToolParameterProperty("string", "command", "Single quick line; not for long/wait-heavy work → StatefulCommand*.", null, true),
                     new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or null.", ["CMD", "PowerShell", "Bash", null], true),
                 ]),
-                Tool.Create("StatefulCommandExecuteTool", """
+                Tool.Create(StatefulExecuteFunctionName, $"""
                 **Stateful persistent shell (global singleton):** use for multi-step same cwd/env, streaming output, polling, and long-running command checks.
                 **Session rules:** keep one stable `instanceId` per task; new id replaces old active shell; do not switch id mid-task.
                 **Concurrency:** stateful calls are serial only for the same task/session (`Execute -> GetOutput -> next step`), no parallel Execute/GetOutput.
@@ -65,7 +71,7 @@ namespace Silmoon.AI.Tools
                 **Wait transparency:** every Execute/GetOutput must state exact wait in the same assistant message (`timeoutMilliseconds` / `waitMilliseconds`, ms + seconds). Avoid vague wait wording.
                 **SSH:** after `ssh`, subsequent commands are remote until `exit`; track local vs remote context.
                 **Flow:** Execute -> GetOutput (optional wait) -> GetSessionStatus when unsure -> Close only when user asks or all work is done.
-                **Params/Safety:** same `os`/`terminalType` semantics as `CommandTool`; no destructive/privileged ops without approval.
+                **Params/Safety:** same `os`/`terminalType` semantics as `{CommandFunctionName}`; no destructive/privileged ops without approval.
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "One stable id for the entire task; reuse on Execute/GetOutput/GetSessionStatus until done.", null, true),
@@ -74,7 +80,7 @@ namespace Silmoon.AI.Tools
                     new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or empty.", ["CMD", "PowerShell", "Bash", null], true),
                     new ToolParameterProperty("integer", "timeoutMilliseconds", "Ms after send before snapshot; shell survives. State ms+seconds to user. Typical 2000–8000 fast; 30000+ slow. Poll GetOutput if needed.", null, true),
                 ]),
-                Tool.Create("StatefulCommandGetOutputTool", """
+                Tool.Create(StatefulGetOutputFunctionName, """
                 Read **new** stdout/stderr since last Execute/GetOutput (no input). Use the same `instanceId` as Execute; if id mismatches, use the active id returned by tool.
                 `waitMilliseconds` waits before reading (`0` = immediate), useful for trickling logs.
                 Same transparency as Execute: state exact wait (ms + seconds). Output also reports whether shell is still running.
@@ -83,14 +89,14 @@ namespace Silmoon.AI.Tools
                     new ToolParameterProperty("string", "instanceId", "Must match active session (same as Execute).", null, true),
                     new ToolParameterProperty("integer", "waitMilliseconds", "Pre-read wait ms (0=immediate). State value to user. Ask user if unsure. Max clamped server-side.", null, false),
                 ]),
-                Tool.Create("StatefulCommandGetSessionStatusTool", """
+                Tool.Create(StatefulGetSessionStatusFunctionName, """
                 Status only (no command/output read). Use when unsure whether shell is alive; prefer this over Close for probing.
                 Wrong `instanceId` returns active id; use that for next Execute/GetOutput.
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "Believed active id; tool may return the real active id.", null, true),
                 ]),
-                Tool.Create("StatefulCommandCloseTool", """
+                Tool.Create(StatefulCloseFunctionName, """
                 **Rare operation.** Keep shell open by default.
                 Close only when user explicitly asks, or when all shell work is finished and no further Execute is needed.
                 Not for routine end-of-turn cleanup. After close, treat the id as ended (next Execute starts/replaces session).
@@ -101,7 +107,7 @@ namespace Silmoon.AI.Tools
             ];
         }
         /// <summary>
-        /// 分发 <see cref="GetTools"/> 中注册的 <c>CommandTool</c>（无状态）与 <c>StatefulCommandExecuteTool*</c>（有状态）工具；有状态实现对应 <c>ExecuteCommand</c> / <c>GetCommandOutput</c> / <c>GetShellSessionStatus</c> / <c>CloseCommand</c>。
+        /// 分发 <see cref="GetTools"/> 中注册的 <c>Sys_Command</c>（无状态）与 <c>Sys_StatefulCommandExecute*</c>（有状态）工具；有状态实现对应 <c>ExecuteCommand</c> / <c>GetCommandOutput</c> / <c>GetShellSessionStatus</c> / <c>CloseCommand</c>。
         /// </summary>
         public static Task<ToolCallResult> ToolCall(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
         {
@@ -112,7 +118,7 @@ namespace Silmoon.AI.Tools
 
             switch (functionName)
             {
-                case "CommandTool":
+                case CommandFunctionName:
                     try
                     {
                         var osN = NormalizeOs(parameters["os"]?.Value<string>());
@@ -122,10 +128,10 @@ namespace Silmoon.AI.Tools
                     }
                     catch (Exception ex)
                     {
-                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"[CommandTool] {ex.Message}"));
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"[{CommandFunctionName}] {ex.Message}"));
                     }
                     break;
-                case "StatefulCommandExecuteTool":
+                case StatefulExecuteFunctionName:
                     var timeoutToken = parameters["timeoutMilliseconds"];
                     int timeoutMs = timeoutToken is null || timeoutToken.Type == JTokenType.Null ? 30_000 : timeoutToken.Value<int>();
                     var shellExecResult = ExecuteCommand(
@@ -136,7 +142,7 @@ namespace Silmoon.AI.Tools
                         timeoutMs);
                     result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(shellExecResult));
                     break;
-                case "StatefulCommandGetOutputTool":
+                case StatefulGetOutputFunctionName:
                     var waitOutToken = parameters["waitMilliseconds"];
                     int waitBeforeReadMs = waitOutToken is null || waitOutToken.Type == JTokenType.Null ? 0 : waitOutToken.Value<int>();
                     if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
@@ -144,12 +150,12 @@ namespace Silmoon.AI.Tools
                     var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
                     result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(shellPollResult));
                     break;
-                case "StatefulCommandGetSessionStatusTool":
+                case StatefulGetSessionStatusFunctionName:
                     result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty)));
                     break;
-                case "StatefulCommandCloseTool":
+                case StatefulCloseFunctionName:
                     CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>("StatefulCommandCloseTool: session closed."));
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>($"{StatefulCloseFunctionName}: session closed."));
                     break;
                 default:
                     break;
@@ -254,8 +260,8 @@ namespace Silmoon.AI.Tools
         /// <param name="timeoutMilliseconds">等待该命令输出的最长时间（毫秒）。到时间后返回当前缓冲区中的全部输出，shell 继续运行。</param>
         static string ExecuteCommand(string instanceId, string os, string command, string terminalType, int timeoutMilliseconds)
         {
-            if (string.IsNullOrWhiteSpace(instanceId)) return "[CommandTool] instanceId 不能为空。";
-            if (string.IsNullOrWhiteSpace(command)) return "[CommandTool] command 不能为空。";
+            if (string.IsNullOrWhiteSpace(instanceId)) return $"[{CommandFunctionName}] instanceId 不能为空。";
+            if (string.IsNullOrWhiteSpace(command)) return $"[{CommandFunctionName}] command 不能为空。";
 
             try
             {
@@ -297,7 +303,7 @@ namespace Silmoon.AI.Tools
                 if (supersededId is not null)
                 {
                     return $"""
-                        [CommandTool] 有状态 shell 为全局单例：已结束并替换此前的实例（旧 instanceId: {supersededId}）。当前活跃 instanceId: {instanceId}。
+                        [{CommandFunctionName}] 有状态 shell 为全局单例：已结束并替换此前的实例（旧 instanceId: {supersededId}）。当前活跃 instanceId: {instanceId}。
 
                         {output}
                         """;
@@ -307,7 +313,7 @@ namespace Silmoon.AI.Tools
             }
             catch (Exception ex)
             {
-                return $"[CommandTool] {ex.Message}";
+                return $"[{CommandFunctionName}] {ex.Message}";
             }
         }
 
@@ -318,7 +324,7 @@ namespace Silmoon.AI.Tools
         static string GetCommandOutput(string instanceId, int waitBeforeReadMilliseconds = 0)
         {
             if (string.IsNullOrWhiteSpace(instanceId))
-                return "[CommandTool] instanceId 不能为空。";
+                return $"[{CommandFunctionName}] instanceId 不能为空。";
 
             if (!TryResolveActiveStatefulSession(instanceId, out var session, out var resolveMsg)) return resolveMsg!;
 
@@ -328,7 +334,7 @@ namespace Silmoon.AI.Tools
             }
             catch (Exception ex)
             {
-                return $"[CommandTool] GetCommandOutput 失败: {ex.Message}";
+                return $"[{CommandFunctionName}] GetCommandOutput 失败: {ex.Message}";
             }
         }
 
@@ -364,7 +370,7 @@ namespace Silmoon.AI.Tools
         /// </summary>
         static string GetShellSessionStatus(string instanceId)
         {
-            if (string.IsNullOrWhiteSpace(instanceId)) return "[CommandTool] instanceId 不能为空。";
+            if (string.IsNullOrWhiteSpace(instanceId)) return $"[{CommandFunctionName}] instanceId 不能为空。";
             PruneStaleTombstones();
             lock (StatefulCommandLock)
             {
@@ -372,7 +378,7 @@ namespace Silmoon.AI.Tools
                 {
                     if (string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal)) return ActiveStatefulSession.DescribeSessionStatus();
                     return $"""
-                        [CommandTool: 会话状态]
+                        [{CommandFunctionName}: 会话状态]
                         有状态模式为全局单例。当前活跃 instanceId: "{ActiveStatefulInstanceId}"（与查询的 "{instanceId}" 不一致）。
                         说明: 仅存在一个持久 shell；请对上述活跃 id 调用 GetOutput/Close，或 Execute 使用新 id 以替换当前 shell。
                         """;
@@ -381,18 +387,18 @@ namespace Silmoon.AI.Tools
 
             if (SessionClosedIntentionallyAt.TryGetValue(instanceId, out var closedAt))
                 return $"""
-                    [CommandTool: 会话状态]
+                    [{CommandFunctionName}: 会话状态]
                     instanceId: {instanceId}
-                    状态: 会话已结束（主动 StatefulCommandCloseTool，或已被新的有状态 instanceId 替换）。非异常崩溃记录。
+                    状态: 会话已结束（主动 {StatefulCloseFunctionName}，或已被新的有状态 instanceId 替换）。非异常崩溃记录。
                     结束时间 (UTC): {closedAt:O}
                     说明: 全局仅允许一个有状态 shell；再次 Execute 可新建（可沿用本 id 或新 id，新 Execute 会占用唯一槽位）。
                     """;
 
             return $"""
-                [CommandTool: 会话状态]
+                [{CommandFunctionName}: 会话状态]
                 instanceId: {instanceId}
                 状态: 当前无匹配记录（可能从未创建、id 拼写错误，或 tombstone 已超过保留时间）。
-                说明: 请先 StatefulCommandExecuteTool，或确认 instanceId。
+                说明: 请先 {StatefulExecuteFunctionName}，或确认 instanceId。
                 """;
         }
 
@@ -427,14 +433,14 @@ namespace Silmoon.AI.Tools
             {
                 if (ActiveStatefulSession == null)
                 {
-                    errorMessage = $"[CommandTool] 当前没有活跃的有状态 shell，请先 ExecuteCommand。查询的 instanceId: \"{instanceId}\"。";
+                    errorMessage = $"[{CommandFunctionName}] 当前没有活跃的有状态 shell，请先 ExecuteCommand。查询的 instanceId: \"{instanceId}\"。";
                     return false;
                 }
 
                 if (!string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal))
                 {
                     errorMessage = $"""
-                        [CommandTool] 有状态 shell 为全局单例。当前活跃 instanceId 为 "{ActiveStatefulInstanceId}"，与 "{instanceId}" 不一致。请使用活跃 id 操作，或 Execute 新 id 以替换当前 shell。
+                        [{CommandFunctionName}] 有状态 shell 为全局单例。当前活跃 instanceId 为 "{ActiveStatefulInstanceId}"，与 "{instanceId}" 不一致。请使用活跃 id 操作，或 Execute 新 id 以替换当前 shell。
                         """;
                     return false;
                 }
@@ -535,7 +541,7 @@ namespace Silmoon.AI.Tools
                 lock (_executeGate)
                 {
                     ThrowIfDisposed();
-                    if (p.HasExited) return "[CommandTool] shell 进程已退出，请使用新的 instanceId 调用 ExecuteCommand。";
+                    if (p.HasExited) return $"[{CommandFunctionName}] shell 进程已退出，请使用新的 instanceId 调用 ExecuteCommand。";
 
                     Console.WriteLineWithColor($"[{os}/{terminalType} (stateful)] [{InstanceTag()}] {command}", ConsoleColor.Green);
 
@@ -562,7 +568,7 @@ namespace Silmoon.AI.Tools
             string FormatFullOutput(Process p)
             {
                 var sb = new StringBuilder();
-                sb.AppendLine("[CommandTool: 当前终端全部输出（超时未终止进程，shell 仍在运行则可持续 GetCommandOutput）]");
+                sb.AppendLine($"[{CommandFunctionName}: 当前终端全部输出（超时未终止进程，shell 仍在运行则可持续 GetCommandOutput）]");
                 sb.Append(_buffer.ToString());
                 sb.AppendLine();
                 sb.AppendLine(p.HasExited
@@ -579,7 +585,7 @@ namespace Silmoon.AI.Tools
                 if (p is null)
                 {
                     return """
-                        [CommandTool: 会话状态]
+                        [{CommandFunctionName}: 会话状态]
                         状态: 内部错误（进程句柄不可用）。
                         """;
                 }
@@ -589,15 +595,15 @@ namespace Silmoon.AI.Tools
                     if (!p.HasExited)
                     {
                         return $"""
-                            [CommandTool: 会话状态]
+                            [{CommandFunctionName}: 会话状态]
                             状态: 运行中（活跃 shell，可继续 Execute / GetOutput）。
                             PID: {p.Id}
-                            说明: 会话仍由本进程托管；若命令长时间无输出，可用 StatefulCommandGetOutputTool 轮询。
+                            说明: 会话仍由本进程托管；若命令长时间无输出，可用 {StatefulGetOutputFunctionName} 轮询。
                             """;
                     }
 
                     return $"""
-                        [CommandTool: 会话状态]
+                        [{CommandFunctionName}: 会话状态]
                         状态: 子进程已退出（非 CloseCommand 路径下 shell 自行结束，或未通过 Close 即崩溃/退出）。
                         退出码: {p.ExitCode}
                         说明: 全局仅一个有状态 shell；进程已退出后请再次 Execute（可沿用或更换 instanceId，新 Execute 会占用唯一槽位）以启动新 shell。
@@ -606,7 +612,7 @@ namespace Silmoon.AI.Tools
                 catch (InvalidOperationException)
                 {
                     return """
-                        [CommandTool: 会话状态]
+                        [{CommandFunctionName}: 会话状态]
                         状态: 无法读取进程状态（进程句柄可能已失效）。
                         """;
                 }
@@ -629,7 +635,7 @@ namespace Silmoon.AI.Tools
                     _incrementalMark = full.Length;
 
                     var sb = new StringBuilder();
-                    sb.AppendLine("[CommandTool: 自上次 GetCommandOutput 以来的新输出]");
+                    sb.AppendLine($"[{CommandFunctionName}: 自上次 GetCommandOutput 以来的新输出]");
                     if (chunk.Length == 0)
                         sb.AppendLine("(无新输出)");
                     else

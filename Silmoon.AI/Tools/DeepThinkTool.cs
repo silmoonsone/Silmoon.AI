@@ -14,6 +14,8 @@ namespace Silmoon.AI.Tools
 {
     public class DeepThinkTool : ExecuteTool
     {
+        public const string CallAgentFunctionName = "Sys_CallAgent";
+
         public INativeChatClient NativeChatClient { get; set; }
         public DeepThinkTool(INativeChatClient nativeChatClient)
         {
@@ -22,11 +24,11 @@ namespace Silmoon.AI.Tools
         public override Tool[] GetTools()
         {
             return [
-                Tool.Create("ask", """
+                Tool.Create(CallAgentFunctionName, $"""
                 Delegate hard tasks to a stronger model and return its reply.
                 Use for: deep reasoning, code review, security analysis, architecture/design, long-form analysis.
                 Skip for simple questions the current model can answer directly.
-                Concurrency: singleton, serial only; never run multiple `ask` calls in parallel.
+                Concurrency: singleton, serial only; never run multiple `{CallAgentFunctionName}` calls in parallel.
                 `system` is optional: empty keeps default delegation prompt; non-empty overrides it for this call.
                 """,
                 [
@@ -43,7 +45,7 @@ namespace Silmoon.AI.Tools
             var functionName = toolCallParameter.FunctionName;
             var parameters = toolCallParameter.Parameters;
 
-            if (functionName == "ask")
+            if (functionName == CallAgentFunctionName)
             {
                 await NotifyToolExecuting(toolCallParameter);
                 string system = parameters["system"]?.ToString();

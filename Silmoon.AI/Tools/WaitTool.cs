@@ -15,6 +15,8 @@ namespace Silmoon.AI.Tools;
 /// </summary>
 public class WaitTool : ExecuteTool
 {
+    public const string WaitFunctionName = "Sys_Wait";
+
     /// <summary>允许的最短等待，避免误传 0 导致 tight loop。</summary>
     public const int MinDurationMs = 100;
     /// <summary>单次等待上限（5 分钟），防止误填过大值长时间阻塞。</summary>
@@ -24,7 +26,7 @@ public class WaitTool : ExecuteTool
     public override Tool[] GetTools()
     {
         return [
-            Tool.Create("WaitTool", """
+            Tool.Create(WaitFunctionName, """
             Pause for a fixed wall-clock duration, then return.
             Use for retry spacing / throttling; not for shell output waiting (use `StatefulCommand*`).
             In the same assistant turn, always state exact wait (`durationMilliseconds` and seconds); avoid vague “wait a bit”.
@@ -45,7 +47,7 @@ public class WaitTool : ExecuteTool
         var functionName = toolCallParameter.FunctionName;
         var parameters = toolCallParameter.Parameters;
 
-        if (functionName == "WaitTool")
+        if (functionName == WaitFunctionName)
         {
             await NotifyToolExecuting(toolCallParameter);
             var token = parameters["durationMilliseconds"];

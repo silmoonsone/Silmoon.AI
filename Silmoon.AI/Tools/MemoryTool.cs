@@ -17,10 +17,10 @@ namespace Silmoon.AI.Tools;
 public class MemoryTool : ExecuteTool
 {
     /// <summary>第一步：取规范，生成记忆包正文。</summary>
-    public const string GetSummarizePromptToolFunctionName = "GetSummarizePromptTool";
+    public const string GetSummarizePromptToolFunctionName = "Sys_GetSummarizePrompt";
 
     /// <summary>第二步：将记忆正文应用为新的首条用户消息并重置历史。</summary>
-    public const string ApplyMemoryToolFunctionName = "ApplyMemoryTool";
+    public const string ApplyMemoryToolFunctionName = "Sys_ApplyMemory";
 
     /// <summary>第一步工具：返回内容即规范提示词，模型读后应在下一轮产出完整记忆包，再调第二步。</summary>
     public static string SummarizeDescription { get; set; } = $"""

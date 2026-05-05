@@ -16,11 +16,13 @@ namespace Silmoon.AI.Tools
 {
     public class FileTool : ExecuteTool
     {
+        public const string FileFunctionName = "IO_File";
+
         public override async Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await CallTool(toolCallParameter, toolCallResult);
         public override Tool[] GetTools()
         {
             return [
-                Tool.Create("FileTool", """
+                Tool.Create(FileFunctionName, """
                 UTF-8 text file read/write (whole-file).
                 Prefer for configs/logs/code text; do not use for binary or shell-dependent behavior.
                 Concurrency: parallel is allowed for independent files/operations.
@@ -45,7 +47,7 @@ namespace Silmoon.AI.Tools
 
             switch (functionName)
             {
-                case "FileTool":
+                case FileFunctionName:
                     var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
                     result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(fileSystemResult.ToJsonString()));
                     break;
