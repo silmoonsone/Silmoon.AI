@@ -16,11 +16,11 @@ namespace Silmoon.AI.Tools
 {
     public class CommandTool : ExecuteTool
     {
-        public const string CommandFunctionName = "Sys_Command";
-        public const string StatefulExecuteFunctionName = "Sys_StatefulCommandExecute";
-        public const string StatefulGetOutputFunctionName = "Sys_StatefulCommandGetOutput";
-        public const string StatefulGetSessionStatusFunctionName = "Sys_StatefulCommandGetSessionStatus";
-        public const string StatefulCloseFunctionName = "Sys_StatefulCommandClose";
+        public const string CommandFunctionName = "Command_Run";
+        public const string StatefulExecuteFunctionName = "Command_StatefulExecute";
+        public const string StatefulGetOutputFunctionName = "Command_StatefulGetOutput";
+        public const string StatefulGetSessionStatusFunctionName = "Command_StatefulGetSessionStatus";
+        public const string StatefulCloseFunctionName = "Command_StatefulClose";
 
         /// <summary>工具 schema 与内部逻辑使用的操作系统标识（大小写不敏感输入会归一化为此）。</summary>
         public const string OsWindows = "Windows";
@@ -48,9 +48,12 @@ namespace Silmoon.AI.Tools
             return [
                 Tool.Create(CommandFunctionName, $"""
                 **Stateless:** new process each call—no persistent cwd/env.
+                **Use as fallback, not default:** prefer any available specialized tool that directly matches the task (read/write file, wait/sleep, world-state lookup, memory flow, deep reasoning, etc.). Use `{CommandFunctionName}` only when no suitable specialized tool is available or applicable.
+                **Selection rule (important):** if a task can be expressed as a deterministic multi-step tool workflow (periodic sampling, polling, retry/backoff, staged checks), prefer tool orchestration over shell scripting loops. Use shell loops only when specialized tools cannot represent the required operation.
+                **Example (non-exclusive):** periodic time reporting is better modeled as serial calls (`Sys_WorldState` + `Wait_Delay`) than `for/while + timeout` in shell.
 
                 **Use for:** fast one-shot commands whose output is complete at process exit (single-line `&&`/`;` is OK).
-                **Do not use for:** streaming/polling/long jobs or multi-step same-shell workflows → use **StatefulCommand***.
+                **Do not use for:** streaming/polling/long jobs or multi-step same-shell workflows → use `{StatefulExecuteFunctionName}` / `{StatefulGetOutputFunctionName}`.
 
                 **Concurrency:** parallel is allowed (isolated processes). If B depends on A, run serially; if independent, parallel is preferred for batch results.
 
@@ -60,7 +63,7 @@ namespace Silmoon.AI.Tools
                 """,
                 [
                     new ToolParameterProperty("string", "os", "Windows | MacOS | Linux.", ["Windows", "MacOS", "Linux"], true),
-                    new ToolParameterProperty("string", "command", "Single quick line; not for long/wait-heavy work → StatefulCommand*.", null, true),
+                    new ToolParameterProperty("string", "command", "Single quick line; not for long/wait-heavy work → Command_Stateful*.", null, true),
                     new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or null.", ["CMD", "PowerShell", "Bash", null], true),
                 ]),
                 Tool.Create(StatefulExecuteFunctionName, $"""
@@ -106,9 +109,7 @@ namespace Silmoon.AI.Tools
                 ]),
             ];
         }
-        /// <summary>
-        /// 分发 <see cref="GetTools"/> 中注册的 <c>Sys_Command</c>（无状态）与 <c>Sys_StatefulCommandExecute*</c>（有状态）工具；有状态实现对应 <c>ExecuteCommand</c> / <c>GetCommandOutput</c> / <c>GetShellSessionStatus</c> / <c>CloseCommand</c>。
-        /// </summary>
+
         public static Task<ToolCallResult> ToolCall(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
         {
             ToolCallResult result = null;

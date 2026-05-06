@@ -9,15 +9,16 @@ using System.Text;
 
 namespace Silmoon.AI.Terminal.Services
 {
-    public class LocalMcpService
+    public class ContextManagerService
     {
         public List<IExecuteTool> ExecuteTools { get; set; } = [
             new FileTool(),
             new CommandTool(),
             new WaitTool(),
+            new WorldStateTool(),
             ];
         SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
-        public LocalMcpService(ISilmoonConfigureService silmoonConfigureService)
+        public ContextManagerService(ISilmoonConfigureService silmoonConfigureService)
         {
             SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
         }

@@ -34,6 +34,7 @@ public class ClientService : IHostedService
         new FileTool().InjectToolCall(NativeChatClient);
         new CommandTool().InjectToolCall(NativeChatClient);
         new WaitTool().InjectToolCall(NativeChatClient);
+        new WorldStateTool().InjectToolCall(NativeChatClient);
         // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool
         new MemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
         //NativeChatClient.EnableThinking = true;

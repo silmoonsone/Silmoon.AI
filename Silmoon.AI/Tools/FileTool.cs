@@ -16,7 +16,7 @@ namespace Silmoon.AI.Tools
 {
     public class FileTool : ExecuteTool
     {
-        public const string FileFunctionName = "IO_File";
+        public const string FileFunctionName = "File_File";
 
         public override async Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await CallTool(toolCallParameter, toolCallResult);
         public override Tool[] GetTools()

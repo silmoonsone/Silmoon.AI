@@ -15,7 +15,7 @@ namespace Silmoon.AI.Tools;
 /// </summary>
 public class WaitTool : ExecuteTool
 {
-    public const string WaitFunctionName = "Sys_Wait";
+    public const string WaitFunctionName = "Wait_Delay";
 
     /// <summary>允许的最短等待，避免误传 0 导致 tight loop。</summary>
     public const int MinDurationMs = 100;
@@ -27,12 +27,10 @@ public class WaitTool : ExecuteTool
     {
         return [
             Tool.Create(WaitFunctionName, """
-            Pause for a fixed wall-clock duration, then return.
-            Use for retry spacing / throttling; not for shell output waiting (use `StatefulCommand*`).
-            In the same assistant turn, always state exact wait (`durationMilliseconds` and seconds); avoid vague “wait a bit”.
-            Parallel waits are possible but usually not useful and can be ambiguous; prefer one call with total duration (e.g., `6000` once, not two parallel `3000`).
-            Default: one wait call per decision step; multiple waits only for truly independent branches.
-            Limits: clamped to **100 ms–300 s**.
+            Wait for the specified milliseconds, then return.
+            This tool has no side effects; it only delays response completion for this call.
+            Important: multiple tool calls in the same assistant interaction are executed in parallel by default; three `3000 ms` waits run together and finish in about `3` seconds wall-clock (not `9` seconds).
+            Limits: duration is clamped to **100 ms–300 s**.
             """,
             [
                 new ToolParameterProperty("integer", "durationMilliseconds", $"Ms to wait (clamped {MinDurationMs}–{MaxDurationMs}). **Same turn:** tell the user this value + seconds before/around the call.", null, true),

@@ -18,8 +18,8 @@ public class ClientService : IHostedService
     NativeChatClient NativeChatClient { get; set; }
     SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
     IHostApplicationLifetime ApplicationLifetime { get; set; }
-    LocalMcpService LocalMcpService { get; set; }
-    public ClientService(ISilmoonConfigureService silmoonConfigureService, LocalMcpService localMcpService, IHostApplicationLifetime applicationLifetime)
+    ContextManagerService LocalMcpService { get; set; }
+    public ClientService(ISilmoonConfigureService silmoonConfigureService, ContextManagerService localMcpService, IHostApplicationLifetime applicationLifetime)
     {
         ApplicationLifetime = applicationLifetime;
         LocalMcpService = localMcpService;
@@ -34,7 +34,7 @@ public class ClientService : IHostedService
         NativeChatClient.OnToolExecuted += NativeChatClient_OnToolExecuted;
         NativeChatClient.OnStreamOutputCompleted += NativeChatClient_OnStreamOutputCompleted;
         LocalMcpService.InjectMcp(NativeChatClient);
-        NativeChatClient.Tools.Add(Tool.Create("ToolCallTestTool", "This is a test tool_calling test tool.", []));
+        NativeChatClient.Tools.Add(Tool.Create("Test_ToolCallTest", "This is a test tool_calling test tool.", []));
         //NativeChatClient.EnableThinking = true;
     }
 

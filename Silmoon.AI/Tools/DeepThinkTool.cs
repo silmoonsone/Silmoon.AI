@@ -14,7 +14,7 @@ namespace Silmoon.AI.Tools
 {
     public class DeepThinkTool : ExecuteTool
     {
-        public const string CallAgentFunctionName = "Sys_CallAgent";
+        public const string CallAgentFunctionName = "DeepThink_Call";
 
         public INativeChatClient NativeChatClient { get; set; }
         public DeepThinkTool(INativeChatClient nativeChatClient)
