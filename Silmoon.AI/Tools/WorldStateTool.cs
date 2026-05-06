@@ -20,6 +20,7 @@ namespace Silmoon.AI.Tools
                 Includes time, timezone, machine and runtime information.
                 Stateless read-only tool; no side effects.
                 Preferred source for "current time now" requests; combine with `Wait_Delay` for periodic serial sampling.
+                Return JSON object with `State`, `Message`, `Data` (`Data` is world-state JSON string).
                 """, []),
             ];
         }
@@ -96,11 +97,11 @@ namespace Silmoon.AI.Tools
                         },
                     });
 
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(payload));
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(payload));
                 }
                 catch (Exception ex)
                 {
-                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"[{WorldStateFunctionName}] {ex.Message}"));
+                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{WorldStateFunctionName}] {ex.Message}"));
                 }
 
                 await NotifyToolExecuted(functionName, toolCallParameter, result);

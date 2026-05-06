@@ -8,9 +8,9 @@ namespace Silmoon.AI.Models
     public class ToolCallResult
     {
         public ToolCallParameter Parameter { get; set; }
-        public StateSet<bool, string> Result { get; set; }
+        public StateSet<bool, object> Result { get; set; }
 
-        public static ToolCallResult Create(ToolCallParameter parameter, StateSet<bool, string> result)
+        public static ToolCallResult Create(ToolCallParameter parameter, StateSet<bool, object> result)
         {
             return new ToolCallResult
             {

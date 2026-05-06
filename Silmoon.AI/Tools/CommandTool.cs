@@ -47,19 +47,15 @@ namespace Silmoon.AI.Tools
         {
             return [
                 Tool.Create(CommandFunctionName, $"""
-                **Stateless:** new process each call—no persistent cwd/env.
-                **Use as fallback, not default:** prefer any available specialized tool that directly matches the task (read/write file, wait/sleep, world-state lookup, memory flow, deep reasoning, etc.). Use `{CommandFunctionName}` only when no suitable specialized tool is available or applicable.
-                **Selection rule (important):** if a task can be expressed as a deterministic multi-step tool workflow (periodic sampling, polling, retry/backoff, staged checks), prefer tool orchestration over shell scripting loops. Use shell loops only when specialized tools cannot represent the required operation.
-                **Example (non-exclusive):** periodic time reporting is better modeled as serial calls (`Sys_WorldState` + `Wait_Delay`) than `for/while + timeout` in shell.
-
-                **Use for:** fast one-shot commands whose output is complete at process exit (single-line `&&`/`;` is OK).
-                **Do not use for:** streaming/polling/long jobs or multi-step same-shell workflows → use `{StatefulExecuteFunctionName}` / `{StatefulGetOutputFunctionName}`.
-
-                **Concurrency:** parallel is allowed (isolated processes). If B depends on A, run serially; if independent, parallel is preferred for batch results.
-
-                **Params:** `os` = Windows|MacOS|Linux; Windows needs `terminalType` CMD|PowerShell; Mac/Linux Bash or omit. Case-insensitive.
-
-                **Safety:** no destructive/privileged ops without user approval.
+                One-shot command in a fresh process (stateless, no persisted cwd/env).
+                Use only for independent short commands.
+                If steps depend on prior shell state (cwd/env/process/ssh context), use `{StatefulExecuteFunctionName}`.
+                Deterministic polling/retry flows should prefer specialized tools.
+                Concurrency: independent calls can run in parallel; dependent calls must be serial.
+                Params: os Windows|MacOS|Linux; Windows terminalType CMD|PowerShell; Mac/Linux Bash or omit.
+                Input is case-insensitive and normalized.
+                Return JSON object with `State`, `Message`, `Data` (command output in `Data`).
+                Safety: no destructive/privileged operations without user approval.
                 """,
                 [
                     new ToolParameterProperty("string", "os", "Windows | MacOS | Linux.", ["Windows", "MacOS", "Linux"], true),
@@ -67,14 +63,14 @@ namespace Silmoon.AI.Tools
                     new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or null.", ["CMD", "PowerShell", "Bash", null], true),
                 ]),
                 Tool.Create(StatefulExecuteFunctionName, $"""
-                **Stateful persistent shell (global singleton):** use for multi-step same cwd/env, streaming output, polling, and long-running command checks.
-                **Session rules:** keep one stable `instanceId` per task; new id replaces old active shell; do not switch id mid-task.
-                **Concurrency:** stateful calls are serial only for the same task/session (`Execute -> GetOutput -> next step`), no parallel Execute/GetOutput.
-                **Command shape:** one line per Execute, no chained multi-step `&&`/`;`.
-                **Wait transparency:** every Execute/GetOutput must state exact wait in the same assistant message (`timeoutMilliseconds` / `waitMilliseconds`, ms + seconds). Avoid vague wait wording.
-                **SSH:** after `ssh`, subsequent commands are remote until `exit`; track local vs remote context.
-                **Flow:** Execute -> GetOutput (optional wait) -> GetSessionStatus when unsure -> Close only when user asks or all work is done.
-                **Params/Safety:** same `os`/`terminalType` semantics as `{CommandFunctionName}`; no destructive/privileged ops without approval.
+                Persistent shell (global singleton), for multi-step dependent commands.
+                Keep one stable instanceId per task; new instanceId replaces old active shell.
+                Important: because tool calls in one interaction may run in parallel, at most ONE stateful call (`{StatefulExecuteFunctionName}`/`{StatefulGetOutputFunctionName}`/`{StatefulGetSessionStatusFunctionName}`/`{StatefulCloseFunctionName}`) should be issued per assistant interaction.
+                Command must be single-line; split steps into multiple calls.
+                Flow: Execute -> GetOutput (optional wait) -> GetSessionStatus if unsure -> Close when done.
+                Params: same os/terminalType semantics as `{CommandFunctionName}`.
+                Return JSON object with `State`, `Message`, `Data` (output/status text in `Data`).
+                Safety: no destructive/privileged operations without user approval.
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "One stable id for the entire task; reuse on Execute/GetOutput/GetSessionStatus until done.", null, true),
@@ -84,25 +80,29 @@ namespace Silmoon.AI.Tools
                     new ToolParameterProperty("integer", "timeoutMilliseconds", "Ms after send before snapshot; shell survives. State ms+seconds to user. Typical 2000–8000 fast; 30000+ slow. Poll GetOutput if needed.", null, true),
                 ]),
                 Tool.Create(StatefulGetOutputFunctionName, """
-                Read **new** stdout/stderr since last Execute/GetOutput (no input). Use the same `instanceId` as Execute; if id mismatches, use the active id returned by tool.
-                `waitMilliseconds` waits before reading (`0` = immediate), useful for trickling logs.
-                Same transparency as Execute: state exact wait (ms + seconds). Output also reports whether shell is still running.
+                Read incremental stdout/stderr since last Execute/GetOutput (no input).
+                Use same instanceId as Execute; if mismatched, tool returns active id hint.
+                waitMilliseconds: wait before read, 0 means immediate.
+                Return JSON object with `State`, `Message`, `Data` (incremental output in `Data`).
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "Must match active session (same as Execute).", null, true),
                     new ToolParameterProperty("integer", "waitMilliseconds", "Pre-read wait ms (0=immediate). State value to user. Ask user if unsure. Max clamped server-side.", null, false),
                 ]),
                 Tool.Create(StatefulGetSessionStatusFunctionName, """
-                Status only (no command/output read). Use when unsure whether shell is alive; prefer this over Close for probing.
-                Wrong `instanceId` returns active id; use that for next Execute/GetOutput.
+                Get session status only (no command execution/output consumption).
+                Use when unsure shell is alive.
+                Wrong instanceId returns active id hint.
+                Return JSON object with `State`, `Message`, `Data` (session status text in `Data`).
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "Believed active id; tool may return the real active id.", null, true),
                 ]),
                 Tool.Create(StatefulCloseFunctionName, """
-                **Rare operation.** Keep shell open by default.
-                Close only when user explicitly asks, or when all shell work is finished and no further Execute is needed.
-                Not for routine end-of-turn cleanup. After close, treat the id as ended (next Execute starts/replaces session).
+                Close active stateful session for the given instanceId.
+                Use when user asks or all shell work is finished.
+                After close, next Execute starts/replaces session.
+                Return JSON object with `State`, `Message`, `Data`.
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "Active session id to close.", null, true),
@@ -125,11 +125,11 @@ namespace Silmoon.AI.Tools
                         var osN = NormalizeOs(parameters["os"]?.Value<string>());
                         var ttN = NormalizeTerminal(parameters["terminalType"]?.Value<string>(), osN);
                         var outText = Execute(osN, parameters["command"]?.Value<string>() ?? string.Empty, ttN);
-                        result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(outText));
+                        result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(outText));
                     }
                     catch (Exception ex)
                     {
-                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"[{CommandFunctionName}] {ex.Message}"));
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{CommandFunctionName}] {ex.Message}"));
                     }
                     break;
                 case StatefulExecuteFunctionName:
@@ -141,7 +141,7 @@ namespace Silmoon.AI.Tools
                         parameters["command"]?.Value<string>() ?? string.Empty,
                         parameters["terminalType"]?.Value<string>() ?? string.Empty,
                         timeoutMs);
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(shellExecResult));
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(shellExecResult));
                     break;
                 case StatefulGetOutputFunctionName:
                     var waitOutToken = parameters["waitMilliseconds"];
@@ -149,14 +149,14 @@ namespace Silmoon.AI.Tools
                     if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
                     if (waitBeforeReadMs > 180_000) waitBeforeReadMs = 180_000;
                     var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(shellPollResult));
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(shellPollResult));
                     break;
                 case StatefulGetSessionStatusFunctionName:
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty)));
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty)));
                     break;
                 case StatefulCloseFunctionName:
                     CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>($"{StatefulCloseFunctionName}: session closed."));
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>($"{StatefulCloseFunctionName}: session closed."));
                     break;
                 default:
                     break;
@@ -619,6 +619,7 @@ namespace Silmoon.AI.Tools
                 }
             }
 
+            /// <summary>读取自上次游标后的新增输出，并附带 shell 运行状态。</summary>
             /// <param name="waitBeforeReadMilliseconds">在加锁读取缓冲区之前先等待的毫秒数，便于收集陆续到达的输出（如 ping）。0 表示不等待。</param>
             public string GetIncrementalOutput(int waitBeforeReadMilliseconds = 0)
             {

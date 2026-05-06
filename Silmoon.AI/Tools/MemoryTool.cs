@@ -36,7 +36,7 @@ public class MemoryTool : ExecuteTool
         该正文是**只读状态记录**，不是待执行任务清单；不要写“再总结/再重置”等元任务。
         本工具可单独使用（仅产出记忆包用于归档/导出/外部用途），不要求立即应用。
         若目标是“总结后立即续接”，按 `{GetSummarizePromptToolFunctionName} -> {ApplyMemoryToolFunctionName}` 串行调用，前一步完成后再执行后一步。
-        正文全文仅在 `{ApplyMemoryToolFunctionName}.continuation_memory` 里提交；助手正文不要重复粘贴全文。
+        正文全文仅在 `{ApplyMemoryToolFunctionName}.continuationMemory` 里提交；助手正文不要重复粘贴全文。
         本工具不会自动再发起模型调用。
         """;
     /// <summary>
@@ -45,10 +45,10 @@ public class MemoryTool : ExecuteTool
     public static string Description { get; set; } = $"""
         **记忆·应用（Memory Apply）**
 
-        将 `continuation_memory` 作为续接记忆应用到会话：清空历史，保留当前系统提示，并把“前缀约束 + 正文”设为新会话首条用户消息。
+        将 `continuationMemory` 作为续接记忆应用到会话：清空历史，保留当前系统提示，并把“前缀约束 + 正文”设为新会话首条用户消息。
         可单独调用（直接接收已准备好的合规记忆包），不要求必须本轮先调用 `{GetSummarizePromptToolFunctionName}`。
         若本轮先总结再应用，必须串行：`{GetSummarizePromptToolFunctionName} -> {ApplyMemoryToolFunctionName}`。
-        正文全文只放在 `continuation_memory` 参数，助手正文不要重复全文。
+        正文全文只放在 `continuationMemory` 参数，助手正文不要重复全文。
         语义是“压缩历史并延续状态”，不是让下一轮再次执行记忆总结/应用流程。
         防重复：`Done` 视为已完成，不再重复执行；`Doing`/`Next` 仅保留实质业务，不写记忆工具链元任务。
         """;
@@ -82,7 +82,7 @@ public class MemoryTool : ExecuteTool
             Tool.Create(GetSummarizePromptToolFunctionName, SummarizeDescription, []),
             Tool.Create(ApplyMemoryToolFunctionName, Description,
             [
-                new ToolParameterProperty("string", "continuation_memory", "中断会话的压缩记忆全文（唯一粘贴处）。语义：多轮信息压缩与状态恢复；非请你再执行总结/应用。勿在助手正文重复全文。", null, true),
+                new ToolParameterProperty("string", "continuationMemory", "中断会话的压缩记忆全文（唯一粘贴处）。语义：多轮信息压缩与状态恢复；非请你再执行总结/应用。勿在助手正文重复全文。", null, true),
             ]),
         ];
     }
@@ -96,15 +96,16 @@ public class MemoryTool : ExecuteTool
 
         if (functionName == GetSummarizePromptToolFunctionName)
         {
-            var prompt = $"请根据以下提示生成续接记忆包（只读状态记录，非待执行清单）。生成后：全文仅通过 {ApplyMemoryToolFunctionName}.continuation_memory 提交；助手回复勿全文复述；勿在 Next 中写「再总结/再重置」。\r\n" + ContinuationMemoryPrompt;
-            result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(prompt));
+            var prompt = $"请根据以下提示生成续接记忆包（只读状态记录，非待执行清单）。生成后：全文仅通过 {ApplyMemoryToolFunctionName}.continuationMemory 提交；助手回复勿全文复述；勿在 Next 中写「再总结/再重置」。\r\n" + ContinuationMemoryPrompt;
+            result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(prompt));
         }
         else if (functionName == ApplyMemoryToolFunctionName)
         {
-            var rawParam = parameters["continuation_memory"]?.Value<string>().Trim();
+            var rawParam = parameters["continuationMemory"]?.Value<string>().Trim()
+                ?? parameters["continuation_memory"]?.Value<string>().Trim();
             if (rawParam.IsNullOrEmpty())
             {
-                result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"continuation_memory 不能为空：请先按 {GetSummarizePromptToolFunctionName} 返回的规范生成完整正文，再作为本参数传入。"));
+                result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"continuationMemory 不能为空：请先按 {GetSummarizePromptToolFunctionName} 返回的规范生成完整正文，再作为本参数传入。"));
             }
             else
             {
@@ -115,7 +116,7 @@ public class MemoryTool : ExecuteTool
                     ["ok"] = true,
                     ["message"] = "已重置：首条用户消息为压缩记忆+前缀约束。勿再调用记忆总结/应用工具；仅推进进行中/待办的实质业务，勿重复已完成。",
                 }.ToString(Formatting.None);
-                result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(resetPayload));
+                result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(resetPayload));
             }
         }
 
@@ -169,7 +170,7 @@ public class MemoryTool : ExecuteTool
             本包能写出即表示该元流程在旧对话中已闭合。如需提及，**仅**在 `Done` 写一条“已产出续接记忆包正文”。
 
             ### 4. 宿主工具（如启用了记忆提交类工具）
-            - 全文**只出现一次**，放入工具参数（如 `continuation_memory`）。
+            - 全文**只出现一次**，放入工具参数（如 `continuationMemory`）。
             - **不要**在助手可见回复里再贴一次全文；留空或一句“已提交续接记忆”即可。
 
             ### 5. 元叙述最小化

@@ -31,6 +31,7 @@ public class WaitTool : ExecuteTool
             This tool has no side effects; it only delays response completion for this call.
             Important: multiple tool calls in the same assistant interaction are executed in parallel by default; three `3000 ms` waits run together and finish in about `3` seconds wall-clock (not `9` seconds).
             Limits: duration is clamped to **100 ms–300 s**.
+            Return JSON object with `State`, `Message`, `Data` (`Data.waitedMilliseconds`, optional `Data.reason`).
             """,
             [
                 new ToolParameterProperty("integer", "durationMilliseconds", $"Ms to wait (clamped {MinDurationMs}–{MaxDurationMs}). **Same turn:** tell the user this value + seconds before/around the call.", null, true),
@@ -51,7 +52,7 @@ public class WaitTool : ExecuteTool
             var token = parameters["durationMilliseconds"];
             if (token is null || token.Type == JTokenType.Null)
             {
-                result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, "durationMilliseconds is required."));
+                result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, "durationMilliseconds is required."));
             }
             else
             {
@@ -69,11 +70,11 @@ public class WaitTool : ExecuteTool
                         waitedMilliseconds = ms,
                         reason = string.IsNullOrWhiteSpace(reason) ? null : reason.Trim(),
                     });
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(payload));
+                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(payload));
                 }
                 catch
                 {
-                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, "durationMilliseconds must be a number."));
+                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, "durationMilliseconds must be a number."));
                 }
             }
             await NotifyToolExecuted(functionName, toolCallParameter, result);

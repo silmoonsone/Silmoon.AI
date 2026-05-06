@@ -27,7 +27,8 @@ namespace Silmoon.AI.Tools
                 Prefer for configs/logs/code text; do not use for binary or shell-dependent behavior.
                 Concurrency: parallel is allowed for independent files/operations.
                 Ordered dependency must be serial (e.g., `write same file -> read verify`); do not parallelize dependent steps.
-                Response is JSON: `read` returns file content; `write` replaces entire file (parent directories must exist).
+                When write, return Data is null. When read, Data is file content.
+                Return JSON object with `State`, `Message`, `Data`. `Data` is a JSON string: `read` includes file content; `write` replaces entire file (parent directories must exist).
                 """,
                 [
                     new ToolParameterProperty("string", "action", "`read` | `write` (full replace).", ["write", "read"], true),
@@ -49,7 +50,7 @@ namespace Silmoon.AI.Tools
             {
                 case FileFunctionName:
                     var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(fileSystemResult.ToJsonString()));
+                    result = ToolCallResult.Create(toolCallParameter, fileSystemResult);
                     break;
                 default:
                     break;
@@ -57,7 +58,7 @@ namespace Silmoon.AI.Tools
             return Task.FromResult(result);
         }
 
-        static StateSet<bool, string> ExecuteTool(string action, string path, string content)
+        static StateSet<bool, object> ExecuteTool(string action, string path, string content)
         {
             switch (action)
             {
@@ -68,22 +69,22 @@ namespace Silmoon.AI.Tools
                 //case "delete":
                 //    return DeleteFile(path);
                 default:
-                    return false.ToStateSet<string>(null, $"Unsupported action: {action}");
+                    return false.ToStateSet<object>(null, $"Unsupported action: {action}");
             }
         }
-        static StateSet<bool, string> WriteFile(string path, string content)
+        static StateSet<bool, object> WriteFile(string path, string content)
         {
             try
             {
                 File.WriteAllText(path, content);
-                return true.ToStateSet<string>(null);
+                return true.ToStateSet<object>(null, "File written successfully.");
             }
             catch (Exception e)
             {
-                return false.ToStateSet<string>(null, message: $"Error writing file: {e.Message}");
+                return false.ToStateSet<object>(null, message: $"Error writing file: {e.Message}");
             }
         }
-        static StateSet<bool, string> ReadFile(string path)
+        static StateSet<bool, object> ReadFile(string path)
         {
             try
             {
@@ -91,13 +92,13 @@ namespace Silmoon.AI.Tools
                 if (File.Exists(path))
                 {
                     string content = File.ReadAllText(path);
-                    return true.ToStateSet<string>(content);
+                    return true.ToStateSet<object>(content);
                 }
-                else return false.ToStateSet<string>(null, message: $"File not found: {path}");
+                else return false.ToStateSet<object>(null, message: $"File not found: {path}");
             }
             catch (Exception e)
             {
-                return false.ToStateSet<string>(null, message: $"Error reading file: {e.Message}");
+                return false.ToStateSet<object>(null, message: $"Error reading file: {e.Message}");
             }
         }
         //public static StateSet<bool, string> DeleteFile(string path)

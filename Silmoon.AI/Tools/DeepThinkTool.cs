@@ -30,6 +30,7 @@ namespace Silmoon.AI.Tools
                 Skip for simple questions the current model can answer directly.
                 Concurrency: singleton, serial only; never run multiple `{CallAgentFunctionName}` calls in parallel.
                 `system` is optional: empty keeps default delegation prompt; non-empty overrides it for this call.
+                Return JSON object with `State`, `Message`, `Data` (`Data` is delegated model result JSON string).
                 """,
                 [
                     new ToolParameterProperty("string", "system", "Optional. Role, format, language. Omit to keep default."),
@@ -75,7 +76,7 @@ namespace Silmoon.AI.Tools
                 Console.WriteLine();
                 Console.WriteLineWithColor("Agent response end:", ConsoleColor.Green, ConsoleColor.Blue);
                 var askResult = Result.Create([.. chunks]);
-                result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<string>(askResult.ToJsonString()));
+                result = ToolCallResult.Create(toolCallParameter, true.ToStateSet((object)askResult));
                 await NotifyToolExecuted(functionName, toolCallParameter, result);
             }
 

@@ -61,16 +61,16 @@ namespace Silmoon.AI
                                 }
                                 catch (Exception ex)
                                 {
-                                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"执行工具调用处理程序发生异常: {ex.Message}"));
+                                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"执行工具调用处理程序发生异常: {ex.Message}"));
                                 }
                             }));
                         }
                         await Task.WhenAll([.. handlerTasks]);
-                        result ??= ToolCallResult.Create(toolCallParameter, false.ToStateSet<string>(null, $"function {toolCallParameter.FunctionName} not implemented."));
+                        result ??= ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"function {toolCallParameter.FunctionName} not implemented."));
                     }
                     catch (Exception ex)
                     {
-                        result = ToolCallResult.Create(null, false.ToStateSet<string>(null, $"执行工具调用发生异常: {ex.Message}"));
+                        result = ToolCallResult.Create(null, false.ToStateSet<object>(null, $"执行工具调用发生异常: {ex.Message}"));
                     }
                     return result;
                 }));
