@@ -37,7 +37,7 @@ public class MemoryTool : ExecuteTool
         本工具可单独使用（仅产出记忆包用于归档/导出/外部用途），不要求立即应用。
         若目标是“总结后立即续接”，按 `{GetSummarizePromptToolFunctionName} -> {ApplyMemoryToolFunctionName}` 串行调用，前一步完成后再执行后一步。
         正文全文仅在 `{ApplyMemoryToolFunctionName}.continuationMemory` 里提交；助手正文不要重复粘贴全文。
-        本工具不会自动再发起模型调用。
+        本工具不会自动再发起模型调用，在用户明确要求总结记忆、压缩记忆，或者生成记忆总结、记忆包调用这个工具。
         """;
     /// <summary>
     /// 第二步工具：传入上一步按规范写好的续接记忆全文。

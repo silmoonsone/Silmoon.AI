@@ -57,7 +57,7 @@ namespace Silmoon.AI
                                 try
                                 {
                                     var tmpResult = await handler(toolCallParameter, result);
-                                    result ??= tmpResult;
+                                    if (tmpResult is not null) result = tmpResult;
                                 }
                                 catch (Exception ex)
                                 {
