@@ -82,7 +82,27 @@ public class NativeChatClient : INativeChatClient
         if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, systemPrompt));
         if (!continuation.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.User, continuation));
     }
+    public void RollbackHistory(uint rounds = 1)
+    {
+        while (rounds > 0)
+        {
+            if (MessageHistory.IsNullOrEmpty()) break;
+            if (MessageHistory.LastOrDefault().Role == Role.System) break;
 
+            while (true)
+            {
+                if (MessageHistory.IsNullOrEmpty()) break;
+                if (MessageHistory.LastOrDefault().Role == Role.System) break;
+
+                MessageHistory.RemoveAt(MessageHistory.Count - 1);
+                if (MessageHistory.LastOrDefault().Role == Role.Assistant && MessageHistory.LastOrDefault().ToolCalls.IsNullOrEmpty())
+                {
+                    rounds--;
+                    break;
+                }
+            }
+        }
+    }
 
     public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
