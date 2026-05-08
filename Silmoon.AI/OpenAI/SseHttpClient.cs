@@ -10,7 +10,7 @@ namespace Silmoon.AI.OpenAI;
 
 public class SseHttpClient : HttpClient
 {
-    JsonSerializerSettings serializerSettings = new JsonSerializerSettings
+    public static JsonSerializerSettings SerializerSettings { get; private set; } = new JsonSerializerSettings
     {
         NullValueHandling = NullValueHandling.Ignore,
         MissingMemberHandling = MissingMemberHandling.Ignore,
@@ -45,7 +45,7 @@ public class SseHttpClient : HttpClient
             request.Stream = false;
             List<Chunk> chunks = [];
             using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-            var jsonString = request.ToJsonString(serializerSettings);
+            var jsonString = request.ToJsonString(SerializerSettings);
 
             //Console.WriteLine($"Request JSON: {jsonString}\r\n");
 
@@ -57,7 +57,7 @@ public class SseHttpClient : HttpClient
                 using var reader = new StreamReader(stream);
                 var json = await reader.ReadToEndAsync();
                 //Console.WriteLine(json);
-                Response responseData = JsonConvert.DeserializeObject<Response>(json, serializerSettings);
+                Response responseData = JsonConvert.DeserializeObject<Response>(json, SerializerSettings);
                 return true.ToStateSet(responseData);
             }
             else
@@ -77,7 +77,7 @@ public class SseHttpClient : HttpClient
         try
         {
             request.Stream = true;
-            var jsonString = request.ToJsonString(serializerSettings);
+            var jsonString = request.ToJsonString(SerializerSettings);
 
             //Console.WriteLine($"Request JSON: {jsonString}");
 
@@ -108,7 +108,7 @@ public class SseHttpClient : HttpClient
                             }
                             else
                             {
-                                var chunkData = JsonConvert.DeserializeObject<Chunk>(json, serializerSettings);
+                                var chunkData = JsonConvert.DeserializeObject<Chunk>(json, SerializerSettings);
                                 if (chunkData != null && chunkData.Choices is not null)
                                 {
                                     chunks.Add(chunkData);
