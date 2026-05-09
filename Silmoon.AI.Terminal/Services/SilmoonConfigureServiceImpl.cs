@@ -24,7 +24,7 @@ namespace Silmoon.AI.Terminal.Services
         public SilmoonConfigureServiceImpl(IOptions<SilmoonConfigureServiceOption> options, ILogger<ISilmoonConfigureService> logger) : base(options)
         {
             Logger = logger;
-            Logger.LogInformation($"当前配置文件{CurrentConfigFilePath}");
+            Logger.LogInformation($"当前配置文件{CurrentConfigFile}");
 
             SystemPrompt = ConfigJson.GetValue("systemPrompt")?.Value<string>();
             var modelObj = ConfigJson["modelProviders"];
