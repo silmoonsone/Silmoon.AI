@@ -102,4 +102,6 @@ public class ToolParameterProperty
         Enum = @enum;
         IsRequired = isRequired;
     }
+
+    public static ToolParameterProperty Create(string type, string name, string description, List<object> @enum = null, bool isRequired = false) => new ToolParameterProperty(type, name, description, @enum, isRequired);
 }
