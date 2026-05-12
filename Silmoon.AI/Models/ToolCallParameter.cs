@@ -16,14 +16,12 @@ namespace Silmoon.AI.Models
 
         public static ToolCallParameter Create(string functionName, JObject parameters, string toolCallId)
         {
+            return new ToolCallParameter
             {
-                return new ToolCallParameter
-                {
-                    FunctionName = functionName,
-                    Parameters = parameters,
-                    ToolCallId = toolCallId
-                };
-            }
+                FunctionName = functionName,
+                Parameters = parameters,
+                ToolCallId = toolCallId
+            };
         }
         public static ToolCallParameter[] Create(List<ToolCall> toolCalls)
         {

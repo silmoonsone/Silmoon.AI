@@ -9,6 +9,8 @@ namespace Silmoon.AI.Models
     {
         [JsonProperty("providerName")]
         public string ProviderName { get; set; }
+        [JsonProperty("providerDescription")]
+        public string ProviderDescription { get; set; }
         [JsonProperty("apiUrl")]
         public string ApiUrl { get; set; }
         [JsonProperty("apiKey")]
