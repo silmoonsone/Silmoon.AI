@@ -13,7 +13,7 @@ using System.Collections.Concurrent;
 
 namespace Silmoon.AI.Terminal.Services;
 
-public class ClientService : IHostedService
+public class ClientService : BackgroundService
 {
     NativeChatClient NativeChatClient { get; set; }
     SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
@@ -23,7 +23,6 @@ public class ClientService : IHostedService
     {
         ApplicationLifetime = applicationLifetime;
         LocalMcpService = localMcpService;
-        ApplicationLifetime.ApplicationStarted.Register(async () => await Start());
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
 
         NativeChatClient = new NativeChatClient(SilmoonConfigureService.DefaultProvider, SilmoonConfigureService.DefaultModelName, UtilPrompt.ContextPrompt);
@@ -66,7 +65,6 @@ public class ClientService : IHostedService
         Console.WriteLineWithColor($"[TOOL CALLS RESULTS] {string.Join(", ", toolCallParameters.Select(x => $"{x.FunctionName}: {toolCallResults.FirstOrDefault(y => y.Parameter.FunctionName == x.FunctionName)?.Result.State}"))}", ConsoleColor.Yellow);
         return Task.FromResult(toolCallResults);
     }
-
     private Task NativeChatClient_OnStreamOutputCompleted(Result result)
     {
         Console.WriteLine();
@@ -74,73 +72,76 @@ public class ClientService : IHostedService
         return Task.CompletedTask;
     }
 
-    public Task StartAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-    public Task StopAsync(CancellationToken cancellationToken) => Task.CompletedTask;
-
-    public async Task Start(bool stream = true)
+    bool stream = true;
+    protected async override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await Task.Run(async () =>
+        await Task.Delay(500);
+        while (true)
         {
-            await Task.Delay(500);
-            while (true)
+            Console.Write(Role.User + ": ");
+            string input = Console.ReadLine();
+            if (input.IsNullOrEmpty())
             {
-                Console.Write(Role.User + ": ");
-                string input = Console.ReadLine();
-                if (input.IsNullOrEmpty()) continue;
-                if (input.FirstOrDefault() == '@')
+                if (input is null)
                 {
-                    string command = input[1..].Trim();
-                    switch (command)
+                    Console.WriteLine("Input terminated");
+                    break;
+                }
+                else continue;
+            }
+            if (input.FirstOrDefault() == '@')
+            {
+                string command = input[1..].Trim();
+                switch (command)
+                {
+                    case "clear":
+                        NativeChatClient.ResetHistory();
+                        Console.WriteLine("Message history cleared.");
+                        break;
+                    case "exit":
+                        Console.WriteLine("Exiting application...");
+                        ApplicationLifetime.StopApplication();
+                        return;
+                    default:
+                        Console.WriteLine($"Unknown command: {command}");
+                        break;
+                }
+            }
+            else
+            {
+                Console.Write(Role.Assistant + ": ");
+
+                if (stream)
+                {
+                    List<Chunk> chunks = [];
+                    await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(input, chunks))
                     {
-                        case "clear":
-                            NativeChatClient.ResetHistory();
-                            Console.WriteLine("Message history cleared.");
-                            break;
-                        case "exit":
-                            Console.WriteLine("Exiting application...");
-                            ApplicationLifetime.StopApplication();
-                            return;
-                        default:
-                            Console.WriteLine($"Unknown command: {command}");
-                            break;
+                        if (chunk.State)
+                        {
+                            chunk.Data.Choices.Each(x =>
+                            {
+                                if (x.Delta?.ToolCalls is not null) Console.Write(".");
+                                else
+                                {
+                                    Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.DarkGray);
+                                    Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
+                                }
+                            });
+                        }
+                        else Console.WriteLineWithColor(chunk.Message, ConsoleColor.Red);
                     }
+                    var result = Result.Create([.. chunks]);
+                    if (result.FinishReason == "tool_calls") Console.WriteWithColor(result.ToolCalls.ToFormattedJsonString(), ConsoleColor.DarkYellow);
                 }
                 else
                 {
-                    Console.Write(Role.Assistant + ": ");
-
-                    if (stream)
-                    {
-                        List<Chunk> chunks = [];
-                        await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(input, chunks))
-                        {
-                            if (chunk.State)
-                            {
-                                chunk.Data.Choices.Each(x =>
-                                {
-                                    if (x.Delta?.ToolCalls is not null) Console.Write(".");
-                                    else
-                                    {
-                                        Console.WriteWithColor(x?.Delta?.GetThinking(), ConsoleColor.DarkGray);
-                                        Console.WriteWithColor(x?.Delta?.Content, ConsoleColor.White);
-                                    }
-                                });
-                            }
-                            else Console.WriteLineWithColor(chunk.Message, ConsoleColor.Red);
-                        }
-                        var result = Result.Create([.. chunks]);
-                        if (result.FinishReason == "tool_calls") Console.WriteWithColor(result.ToolCalls.ToFormattedJsonString(), ConsoleColor.DarkYellow);
-                    }
-                    else
-                    {
-                        Response response = await NativeChatClient.CompletionsAsync(input);
-                        response.Choices.Each(x => Console.WriteWithColor(x?.Message?.Content, ConsoleColor.White));
-                        Console.WriteLine($"【完成{response.Choices[0].FinishReason}】");
-                        if (response.Choices[0].FinishReason == "tool_calls") Console.WriteWithColor(response.Choices[0].Message.ToolCalls?.ToFormattedJsonString(), ConsoleColor.DarkYellow);
-                    }
-                    Console.WriteLine();
+                    Response response = await NativeChatClient.CompletionsAsync(input);
+                    response.Choices.Each(x => Console.WriteWithColor(x?.Message?.Content, ConsoleColor.White));
+                    Console.WriteLine($"【完成{response.Choices[0].FinishReason}】");
+                    if (response.Choices[0].FinishReason == "tool_calls") Console.WriteWithColor(response.Choices[0].Message.ToolCalls?.ToFormattedJsonString(), ConsoleColor.DarkYellow);
                 }
+                Console.WriteLine();
             }
-        });
+        }
     }
 }
