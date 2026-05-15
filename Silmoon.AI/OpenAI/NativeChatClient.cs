@@ -28,13 +28,13 @@ public class NativeChatClient : INativeChatClient
 
     public bool EnableThinking { get; set; } = false;
     public bool EnableSearch { get; set; } = false;
-    public List<MessageContent> MessageHistory { get; set; } = [];
+    public List<IMessage> MessageHistory { get; set; } = [];
 
     public string SystemPrompt
     {
         set
         {
-            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System);
+            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System) as MessageContent;
             if (value is null)
             {
                 if (systemMessage is not null) MessageHistory.Remove(systemMessage);
@@ -45,7 +45,7 @@ public class NativeChatClient : INativeChatClient
                 else systemMessage.Content = value;
             }
         }
-        get => MessageHistory.FirstOrDefault(m => m.Role == Role.System)?.Content;
+        get => (MessageHistory.FirstOrDefault(m => m.Role == Role.System) as MessageContent)?.Content;
     }
     public List<Tool> Tools { get; set; } = [];
 
@@ -111,7 +111,7 @@ public class NativeChatClient : INativeChatClient
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(IMessage content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
@@ -119,7 +119,7 @@ public class NativeChatClient : INativeChatClient
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         chunks ??= [];
         model ??= ModelName;
@@ -198,12 +198,12 @@ public class NativeChatClient : INativeChatClient
     }
 
     public async Task<Response> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
-    public async Task<Response> CompletionsAsync(MessageContent content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<Response> CompletionsAsync(List<MessageContent> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<Response> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         model ??= ModelName;
         while (true)

@@ -18,7 +18,7 @@ public interface INativeChatClient : IDisposable
     string ModelName { get; set; }
     string SystemPrompt { get; set; }
     List<Tool> Tools { get; set; }
-    List<MessageContent> MessageHistory { get; set; }
+    List<IMessage> MessageHistory { get; set; }
     ExecuteToolManager ExecuteToolManager { get; set; }
 
     /// <summary>
@@ -27,10 +27,10 @@ public interface INativeChatClient : IDisposable
     /// <param name="continuation">续接记忆正文；为空或未提供时不追加 User，效果为「清掉多轮，只留 System」。</param>
     void ResetHistory(string? continuation = null);
     IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
-    IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(MessageContent content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
-    IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<MessageContent> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
+    IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(IMessage content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
+    IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
 
     Task<Response> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
-    Task<Response> CompletionsAsync(MessageContent content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
-    Task<Response> CompletionsAsync(List<MessageContent> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
+    Task<Response> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
+    Task<Response> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
 }

@@ -14,6 +14,7 @@ public class SseHttpClient : HttpClient
     {
         NullValueHandling = NullValueHandling.Ignore,
         MissingMemberHandling = MissingMemberHandling.Ignore,
+        TypeNameHandling = TypeNameHandling.Auto,
     };
 
     public SseHttpClient(int? requestTimeoutMilliseconds = null) : base(new HttpClientHandler { UseProxy = false, Proxy = null })

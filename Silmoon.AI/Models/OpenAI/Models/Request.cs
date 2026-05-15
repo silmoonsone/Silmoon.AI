@@ -8,7 +8,7 @@ public class Request
     [JsonProperty("model")]
     public string Model { get; set; }
     [JsonProperty("messages")]
-    public MessageContent[] Messages { get; set; }
+    public IMessage[] Messages { get; set; }
     [JsonProperty("stream")]
     public bool? Stream { get; set; }
     [JsonProperty("temperature")]
@@ -61,7 +61,7 @@ public class Request
         else Thinking = false;
     }
 
-    public Request(string model, MessageContent[] messages, bool stream = true)
+    public Request(string model, IMessage[] messages, bool stream = true)
     {
         Model = model;
         Messages = messages;
