@@ -50,7 +50,7 @@ namespace Silmoon.AI.Tools
         }
 
 
-        public Task<ToolCallResult> CallTool(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
+        public async Task<ToolCallResult> CallTool(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
         {
             ToolCallResult result = null;
 
@@ -60,17 +60,21 @@ namespace Silmoon.AI.Tools
             switch (functionName)
             {
                 case FileFunctionName:
+                    await NotifyToolExecuting(functionName, toolCallParameter);
                     var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
                     result = ToolCallResult.Create(toolCallParameter, fileSystemResult);
+                    await NotifyToolExecuted(functionName, toolCallParameter, result);
                     break;
                 case ReadLinesFunctionName:
+                    await NotifyToolExecuting(functionName, toolCallParameter);
                     var readLinesResult = ReadLines(parameters["path"].Value<string>(), parameters["maxLines"], parameters["direction"]?.Value<string>() ?? "head");
                     result = ToolCallResult.Create(toolCallParameter, readLinesResult);
+                    await NotifyToolExecuted(functionName, toolCallParameter, result);
                     break;
                 default:
                     break;
             }
-            return Task.FromResult(result);
+            return result;
         }
 
         StateSet<bool, object> ExecuteTool(string action, string path, string content)

@@ -110,7 +110,7 @@ namespace Silmoon.AI.Tools
             ];
         }
 
-        public static Task<ToolCallResult> ToolCall(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
+        public async Task<ToolCallResult> ToolCall(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
         {
             ToolCallResult result = null;
 
@@ -122,6 +122,7 @@ namespace Silmoon.AI.Tools
                 case CommandFunctionName:
                     try
                     {
+                        await NotifyToolExecuting(functionName, toolCallParameter);
                         var osN = NormalizeOs(parameters["os"]?.Value<string>());
                         var ttN = NormalizeTerminal(parameters["terminalType"]?.Value<string>(), osN);
                         var outText = Execute(osN, parameters["command"]?.Value<string>() ?? string.Empty, ttN);
@@ -130,9 +131,11 @@ namespace Silmoon.AI.Tools
                     catch (Exception ex)
                     {
                         result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{CommandFunctionName}] {ex.Message}"));
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
                     }
                     break;
                 case StatefulExecuteFunctionName:
+                    await NotifyToolExecuting(functionName, toolCallParameter);
                     var timeoutToken = parameters["timeoutMilliseconds"];
                     int timeoutMs = timeoutToken is null || timeoutToken.Type == JTokenType.Null ? 30_000 : timeoutToken.Value<int>();
                     var shellExecResult = ExecuteCommand(
@@ -142,26 +145,33 @@ namespace Silmoon.AI.Tools
                         parameters["terminalType"]?.Value<string>() ?? string.Empty,
                         timeoutMs);
                     result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(shellExecResult));
+                    await NotifyToolExecuted(functionName, toolCallParameter, result);
                     break;
                 case StatefulGetOutputFunctionName:
+                    await NotifyToolExecuting(functionName, toolCallParameter);
                     var waitOutToken = parameters["waitMilliseconds"];
                     int waitBeforeReadMs = waitOutToken is null || waitOutToken.Type == JTokenType.Null ? 0 : waitOutToken.Value<int>();
                     if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
                     if (waitBeforeReadMs > 180_000) waitBeforeReadMs = 180_000;
                     var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
                     result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(shellPollResult));
+                    await NotifyToolExecuted(functionName, toolCallParameter, result);
                     break;
                 case StatefulGetSessionStatusFunctionName:
+                    await NotifyToolExecuting(functionName, toolCallParameter);
                     result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty)));
+                    await NotifyToolExecuted(functionName, toolCallParameter, result);
                     break;
                 case StatefulCloseFunctionName:
+                    await NotifyToolExecuting(functionName, toolCallParameter);
                     CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
                     result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>($"{StatefulCloseFunctionName}: session closed."));
+                    await NotifyToolExecuted(functionName, toolCallParameter, result);
                     break;
                 default:
                     break;
             }
-            return Task.FromResult(result);
+            return result;
         }
 
         /// <summary>大小写不敏感：按小写分支，返回规范常量。</summary>

@@ -87,7 +87,7 @@ public class MemoryTool : ExecuteTool
         ];
     }
 
-    public override Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
+    public override async Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
     {
         ToolCallResult result = null;
 
@@ -96,19 +96,17 @@ public class MemoryTool : ExecuteTool
 
         if (functionName == GetSummarizePromptToolFunctionName)
         {
+            await NotifyToolExecuting(functionName, toolCallParameter);
             var prompt = $"请根据以下提示生成续接记忆包（只读状态记录，非待执行清单）。生成后：全文仅通过 {ApplyMemoryToolFunctionName}.continuationMemory 提交；助手回复勿全文复述；勿在 Next 中写「再总结/再重置」。\r\n" + ContinuationMemoryPrompt;
             result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(prompt));
+            await NotifyToolExecuted(functionName, toolCallParameter, result);
         }
         else if (functionName == ApplyMemoryToolFunctionName)
         {
-            var rawParam = parameters["continuationMemory"]?.Value<string>().Trim()
-                ?? parameters["continuation_memory"]?.Value<string>().Trim();
-            if (rawParam.IsNullOrEmpty())
+            var rawParam = parameters["continuationMemory"]?.Value<string>().Trim() ?? parameters["continuation_memory"]?.Value<string>().Trim();
+            if (!rawParam.IsNullOrEmpty())
             {
-                result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"continuationMemory 不能为空：请先按 {GetSummarizePromptToolFunctionName} 返回的规范生成完整正文，再作为本参数传入。"));
-            }
-            else
-            {
+                await NotifyToolExecuting(functionName, toolCallParameter);
                 rawParam = UserMessagePrefix.IsNullOrEmpty() ? rawParam : UserMessagePrefix + rawParam;
                 NativeChatClient.ResetHistory(rawParam);
                 var resetPayload = new JObject
@@ -117,10 +115,13 @@ public class MemoryTool : ExecuteTool
                     ["message"] = "已重置：首条用户消息为压缩记忆+前缀约束。勿再调用记忆总结/应用工具；仅推进进行中/待办的实质业务，勿重复已完成。",
                 }.ToString(Formatting.None);
                 result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(resetPayload));
+                await NotifyToolExecuted(functionName, toolCallParameter, result);
             }
+            else
+                result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"continuationMemory 不能为空：请先按 {GetSummarizePromptToolFunctionName} 返回的规范生成完整正文，再作为本参数传入。"));
         }
 
-        return Task.FromResult(result);
+        return result;
     }
 
 
