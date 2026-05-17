@@ -64,7 +64,7 @@ public class MessageContent : Message<string>
             ToolCalls = toolCalls
         };
     }
-    public override string GetContent() => Content.ToString();
+    public override string GetContent() => Content;
 }
 public class MessageJson : Message<JObject>
 {
