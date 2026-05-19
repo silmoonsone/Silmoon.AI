@@ -75,6 +75,11 @@ public class NativeChatClient : INativeChatClient
         HttpClient = new SseHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
+    public void RebuildHttpClient()
+    {
+        HttpClient.DefaultRequestHeaders.Clear();
+        HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
+    }
     public void ResetHistory(string continuation = null)
     {
         var systemPrompt = SystemPrompt;
