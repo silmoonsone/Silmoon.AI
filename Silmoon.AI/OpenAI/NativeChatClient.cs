@@ -9,6 +9,7 @@ using System.Threading.Channels;
 using Silmoon.AI.Tools;
 using Silmoon.AI.Models;
 using System.Collections.Concurrent;
+using Silmoon.Threading;
 
 namespace Silmoon.AI.OpenAI;
 
@@ -25,6 +26,8 @@ public class NativeChatClient : INativeChatClient
     public string ModelName { get; set; }
     SseHttpClient HttpClient { get; set; }
     public ExecuteToolManager ExecuteToolManager { get; set; }
+    public ManualResetEvent BusyResetEvent { get; private set; } = new ManualResetEvent(true);
+    public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
 
     public bool EnableThinking { get; set; } = false;
     public bool EnableSearch { get; set; } = false;
@@ -210,6 +213,8 @@ public class NativeChatClient : INativeChatClient
     }
     public async Task<Response> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
+        using var _ = await BusyAsyncLock.LockAsync();
+        BusyResetEvent.Reset();
         model ??= ModelName;
         while (true)
         {
@@ -225,12 +230,7 @@ public class NativeChatClient : INativeChatClient
             //temp ignore this event.
             //OnNativeClientChatFinished?.Invoke(Result.Create(response.Data.Choices));
 
-            if (firstChoice?.FinishReason == "stop")
-            {
-                messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
-                return response.Data;
-            }
-            else if (firstChoice?.FinishReason == "tool_calls")
+            if (firstChoice?.FinishReason == "tool_calls")
             {
                 messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
                 if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
@@ -251,8 +251,14 @@ public class NativeChatClient : INativeChatClient
                     }
                     continue;
                 }
-                return response.Data;
             }
+            else if (firstChoice?.FinishReason == "stop")
+            {
+                messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
+            }
+
+            BusyResetEvent.Set();
+            return response.Data;
         }
     }
 
@@ -272,5 +278,7 @@ public class NativeChatClient : INativeChatClient
         MessageHistory.Clear();
         MessageHistory = null;
         HttpClient.Dispose();
+        BusyResetEvent.Dispose();
+        BusyAsyncLock.Dispose();
     }
 }
