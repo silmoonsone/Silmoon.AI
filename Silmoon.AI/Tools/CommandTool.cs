@@ -131,42 +131,85 @@ namespace Silmoon.AI.Tools
                     catch (Exception ex)
                     {
                         result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{CommandFunctionName}] {ex.Message}"));
+                    }
+                    finally
+                    {
                         await NotifyToolExecuted(functionName, toolCallParameter, result);
                     }
                     break;
                 case StatefulExecuteFunctionName:
-                    await NotifyToolExecuting(functionName, toolCallParameter);
-                    var timeoutToken = parameters["timeoutMilliseconds"];
-                    int timeoutMs = timeoutToken is null || timeoutToken.Type == JTokenType.Null ? 30_000 : timeoutToken.Value<int>();
-                    var shellExecResult = ExecuteCommand(
-                        parameters["instanceId"]?.Value<string>() ?? string.Empty,
-                        parameters["os"]?.Value<string>() ?? string.Empty,
-                        parameters["command"]?.Value<string>() ?? string.Empty,
-                        parameters["terminalType"]?.Value<string>() ?? string.Empty,
-                        timeoutMs);
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(shellExecResult));
-                    await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    try
+                    {
+                        await NotifyToolExecuting(functionName, toolCallParameter);
+                        var timeoutToken = parameters["timeoutMilliseconds"];
+                        int timeoutMs = timeoutToken is null || timeoutToken.Type == JTokenType.Null ? 30_000 : timeoutToken.Value<int>();
+                        var shellExecResult = ExecuteCommand(
+                            parameters["instanceId"]?.Value<string>() ?? string.Empty,
+                            parameters["os"]?.Value<string>() ?? string.Empty,
+                            parameters["command"]?.Value<string>() ?? string.Empty,
+                            parameters["terminalType"]?.Value<string>() ?? string.Empty,
+                            timeoutMs);
+                        result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(shellExecResult));
+                    }
+                    catch (Exception ex)
+                    {
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{StatefulExecuteFunctionName}] {ex.Message}"));
+                    }
+                    finally
+                    {
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    }
                     break;
                 case StatefulGetOutputFunctionName:
-                    await NotifyToolExecuting(functionName, toolCallParameter);
-                    var waitOutToken = parameters["waitMilliseconds"];
-                    int waitBeforeReadMs = waitOutToken is null || waitOutToken.Type == JTokenType.Null ? 0 : waitOutToken.Value<int>();
-                    if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
-                    if (waitBeforeReadMs > 180_000) waitBeforeReadMs = 180_000;
-                    var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(shellPollResult));
-                    await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    try
+                    {
+                        await NotifyToolExecuting(functionName, toolCallParameter);
+                        var waitOutToken = parameters["waitMilliseconds"];
+                        int waitBeforeReadMs = waitOutToken is null || waitOutToken.Type == JTokenType.Null ? 0 : waitOutToken.Value<int>();
+                        if (waitBeforeReadMs < 0) waitBeforeReadMs = 0;
+                        if (waitBeforeReadMs > 180_000) waitBeforeReadMs = 180_000;
+                        var shellPollResult = GetCommandOutput(parameters["instanceId"]?.Value<string>() ?? string.Empty, waitBeforeReadMs);
+                        result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(shellPollResult));
+                    }
+                    catch (Exception ex)
+                    {
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{StatefulGetOutputFunctionName}] {ex.Message}"));
+                    }
+                    finally
+                    {
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    }
                     break;
                 case StatefulGetSessionStatusFunctionName:
-                    await NotifyToolExecuting(functionName, toolCallParameter);
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty)));
-                    await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    try
+                    {
+                        await NotifyToolExecuting(functionName, toolCallParameter);
+                        result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>(GetShellSessionStatus(parameters["instanceId"]?.Value<string>() ?? string.Empty)));
+                    }
+                    catch (Exception ex)
+                    {
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{StatefulGetSessionStatusFunctionName}] {ex.Message}"));
+                    }
+                    finally
+                    {
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    }
                     break;
                 case StatefulCloseFunctionName:
-                    await NotifyToolExecuting(functionName, toolCallParameter);
-                    CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
-                    result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>($"{StatefulCloseFunctionName}: session closed."));
-                    await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    try
+                    {
+                        await NotifyToolExecuting(functionName, toolCallParameter);
+                        CloseCommand(parameters["instanceId"]?.Value<string>() ?? string.Empty);
+                        result = ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>($"{StatefulCloseFunctionName}: session closed."));
+                    }
+                    catch (Exception ex)
+                    {
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{StatefulCloseFunctionName}] {ex.Message}"));
+                    }
+                    finally
+                    {
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    }
                     break;
                 default:
                     break;
