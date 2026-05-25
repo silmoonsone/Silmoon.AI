@@ -52,11 +52,12 @@ public class NativeChatClient : INativeChatClient
     }
     public List<Tool> Tools { get; set; } = [];
 
-    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
     {
         ModelProvider = provider;
         ModelName = modelName;
         SystemPrompt = systemPrompt;
+        EnableThinking = enableThinking;
 
         ExecuteToolManager = new ExecuteToolManager(this);
 
@@ -68,7 +69,7 @@ public class NativeChatClient : INativeChatClient
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, modelName), modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds)
+    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
     {
     }
 
@@ -169,16 +170,16 @@ public class NativeChatClient : INativeChatClient
             var chunkStates = await callbackTask;
             if (chunkStates.State)
             {
-                var result = Result.Create([.. chunkStates.Data]);
+                var result = Result.Create([.. chunkStates.Data], EnableThinking);
                 OnStreamOutputCompleted?.Invoke(result);
                 if (result.FinishReason == "stop")
                 {
-                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
+                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, reasoningContent: result.ReasoningContent));
                     break;
                 }
                 else if (result.FinishReason == "tool_calls")
                 {
-                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
+                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls], reasoningContent: result.ReasoningContent));
                     if (!result.ToolCalls.IsNullOrEmpty())
                     {
                         ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(result.ToolCalls);

@@ -46,22 +46,27 @@ public abstract class Message<TContent> : Message, IMessage<TContent>
 
 public class MessageContent : Message<string>
 {
-    public static MessageContent Create(Role role, string content, string toolCallId)
+    [JsonProperty("reasoning_content")]
+    public string ReasoningContent { get; set; }
+
+    public static MessageContent Create(Role role, string content, string toolCallId, string reasoningContent = null)
     {
         return new MessageContent
         {
             Role = role,
             Content = content,
             ToolCallId = toolCallId,
+            ReasoningContent = reasoningContent,
         };
     }
-    public static MessageContent Create(Role role, string content, List<ToolCall> toolCalls = null)
+    public static MessageContent Create(Role role, string content, List<ToolCall> toolCalls = null, string reasoningContent = null)
     {
         return new MessageContent
         {
             Role = role,
             Content = content,
-            ToolCalls = toolCalls
+            ToolCalls = toolCalls,
+            ReasoningContent = reasoningContent,
         };
     }
     public override string GetContent() => Content;
@@ -88,20 +93,20 @@ public class MessageJson : Message<JObject>
     }
     public override string GetContent() => Content.ToJsonString();
 }
-public class MessageContents<TContent> : Message<TContent[]>
+public class Messages<TContent> : Message<TContent[]>
 {
-    public static MessageContents<TContent> Create(Role role, TContent[] content, string toolCallId)
+    public static Messages<TContent> Create(Role role, TContent[] content, string toolCallId)
     {
-        return new MessageContents<TContent>
+        return new Messages<TContent>
         {
             Role = role,
             Content = content,
             ToolCallId = toolCallId,
         };
     }
-    public static MessageContents<TContent> Create(Role role, TContent[] content, List<ToolCall> toolCalls = null)
+    public static Messages<TContent> Create(Role role, TContent[] content, List<ToolCall> toolCalls = null)
     {
-        return new MessageContents<TContent>
+        return new Messages<TContent>
         {
             Role = role,
             Content = content,
