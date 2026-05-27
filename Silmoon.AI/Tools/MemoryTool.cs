@@ -108,7 +108,7 @@ public class MemoryTool : ExecuteTool
             {
                 await NotifyToolExecuting(functionName, toolCallParameter);
                 rawParam = UserMessagePrefix.IsNullOrEmpty() ? rawParam : UserMessagePrefix + rawParam;
-                NativeChatClient.ResetHistory(rawParam);
+                NativeChatClient.ClearHistory(rawParam);
                 var resetPayload = new JObject
                 {
                     ["ok"] = true,

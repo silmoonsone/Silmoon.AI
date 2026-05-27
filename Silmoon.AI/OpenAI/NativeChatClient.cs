@@ -84,7 +84,7 @@ public class NativeChatClient : INativeChatClient
         HttpClient.DefaultRequestHeaders.Clear();
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
-    public void ResetHistory(string continuation = null)
+    public void ClearHistory(string continuation = null)
     {
         var systemPrompt = SystemPrompt;
         MessageHistory.Clear();

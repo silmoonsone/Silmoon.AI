@@ -115,7 +115,7 @@ public class ClientService : IHostedService
                     switch (command)
                     {
                         case "clear":
-                            NativeChatClient.ResetHistory();
+                            NativeChatClient.ClearHistory();
                             Console.WriteLine("Message history cleared.");
                             break;
                         case "exit":
