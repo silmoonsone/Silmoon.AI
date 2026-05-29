@@ -13,9 +13,11 @@ public class Result
     public string ReasoningContent { get; set; }
     public string FinishReason { get; set; }
     public List<ToolCall> ToolCalls { get; set; } = [];
-    public static Result Create(ChunkChoice[] chunkChoices, bool includeReasonContent = false)
+    public Usage? Usage { get; set; }
+
+    public static Result Create(ChunkChoice[] chunkChoices, Usage usage = null, bool includeReasonContent = false)
     {
-        Result result = new Result();
+        var result = new Result() { Usage = usage };
         Dictionary<int, ToolCall> toolCallsByIndex = [];
         if (chunkChoices is not null && chunkChoices.Length > 0)
         {
@@ -43,12 +45,14 @@ public class Result
     public static Result Create(Chunk[] responses, bool includeReasonContent = false)
     {
         List<ChunkChoice> chunkChoices = [];
+        Usage usage = null;
         foreach (var response in responses)
         {
             if (!response.Choices.IsNullOrEmpty()) chunkChoices.AddRange(response.Choices);
+            if (response.Usage is not null) usage = response.Usage;
         }
 
-        return Create([.. chunkChoices], includeReasonContent);
+        return Create([.. chunkChoices], usage, includeReasonContent);
     }
 
 

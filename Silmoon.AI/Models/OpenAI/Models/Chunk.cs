@@ -15,4 +15,6 @@ public class Chunk
     public string Object { get; set; }
     [JsonProperty("created")]
     public int Created { get; set; }
+    [JsonProperty("usage")]
+    public Usage Usage { get; set; }
 }

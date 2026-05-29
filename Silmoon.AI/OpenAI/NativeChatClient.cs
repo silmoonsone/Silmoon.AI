@@ -219,7 +219,7 @@ public class NativeChatClient : INativeChatClient
         model ??= ModelName;
         while (true)
         {
-            Request request = new Request(model, [.. messageHistory]);
+            var request = new Request(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.EnableSearch = EnableSearch;
             request.Tools = tools ?? Tools;

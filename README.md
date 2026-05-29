@@ -8,7 +8,7 @@
 
 | 能力 | 说明 |
 |------|------|
-| 聊天 | 普通请求与 **SSE 流式**；可按厂商配置思考、联网等（`EnableThinking`、`EnableSearch` 等，见 `Request`）。 |
+| 聊天 | 普通请求与 **SSE 流式**；流式回合的 **`Result`** 可附带 **`Usage`**（token 用量，视厂商返回字段而定）；可按厂商配置思考、联网等（`EnableThinking`、`EnableSearch` 等，见 `Request`）。 |
 | 推理链 | 支持将模型的 **思考/推理内容**（如 `reasoning_content`）随助手消息写入历史，流式输出时可与正文分开展示（示例见 Terminal 的 `ClientService`）。 |
 | 消息 | 会话历史为 **`IMessage`**，除普通文本（`MessageContent`）外，还可使用 JSON、多段内容、图文片段等形态（见 `Models/OpenAI/Models/Message.cs`）。 |
 | 工具 | 向模型注册函数 schema；模型发起 `tool_calls` 后由 **`ExecuteToolManager`** 调度，你在 **`OnToolCallInvoke`** 等事件中实现逻辑，库负责写回结果并继续对话。 |

@@ -61,7 +61,7 @@ namespace Silmoon.AI
                                 }
                                 catch (Exception ex)
                                 {
-                                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"执行工具调用处理程序发生异常: {ex.Message}"));
+                                    result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"执行工具调用处理程序发生异常: {ex}"));
                                 }
                             }));
                         }

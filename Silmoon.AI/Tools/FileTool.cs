@@ -60,16 +60,38 @@ namespace Silmoon.AI.Tools
             switch (functionName)
             {
                 case FileFunctionName:
-                    await NotifyToolExecuting(functionName, toolCallParameter);
-                    var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
-                    result = ToolCallResult.Create(toolCallParameter, fileSystemResult);
-                    await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    try
+                    {
+                        await NotifyToolExecuting(functionName, toolCallParameter);
+                        var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
+                        result = ToolCallResult.Create(toolCallParameter, fileSystemResult);
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    }
+                    catch (Exception ex)
+                    {
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{FileFunctionName}] {ex.Message}"));
+                    }
+                    finally
+                    {
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    }
                     break;
                 case ReadLinesFunctionName:
-                    await NotifyToolExecuting(functionName, toolCallParameter);
-                    var readLinesResult = ReadLines(parameters["path"].Value<string>(), parameters["maxLines"], parameters["direction"]?.Value<string>() ?? "head");
-                    result = ToolCallResult.Create(toolCallParameter, readLinesResult);
-                    await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    try
+                    {
+                        await NotifyToolExecuting(functionName, toolCallParameter);
+                        var readLinesResult = ReadLines(parameters["path"].Value<string>(), parameters["maxLines"], parameters["direction"]?.Value<string>() ?? "head");
+                        result = ToolCallResult.Create(toolCallParameter, readLinesResult);
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    }
+                    catch (Exception ex)
+                    {
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{FileFunctionName}] {ex.Message}"));
+                    }
+                    finally
+                    {
+                        await NotifyToolExecuted(functionName, toolCallParameter, result);
+                    }
                     break;
                 default:
                     break;
