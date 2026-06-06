@@ -17,26 +17,14 @@ public class SseHttpClient : HttpClient
         TypeNameHandling = TypeNameHandling.Auto,
     };
 
-    public SseHttpClient(int? requestTimeoutMilliseconds = null) : base(new HttpClientHandler { UseProxy = false, Proxy = null })
-    {
-        ApplyRequestTimeout(requestTimeoutMilliseconds);
-    }
-
-    public SseHttpClient(bool disableProxy, int? requestTimeoutMilliseconds = null) : base(new HttpClientHandler { UseProxy = !disableProxy, Proxy = null })
-    {
-        ApplyRequestTimeout(requestTimeoutMilliseconds);
-    }
-
-    public SseHttpClient(HttpClientHandler httpClientHandler, int? requestTimeoutMilliseconds = null) : base(httpClientHandler)
-    {
-        ApplyRequestTimeout(requestTimeoutMilliseconds);
-    }
+    public SseHttpClient(int? requestTimeoutMilliseconds = null) : base(new HttpClientHandler { UseProxy = false, Proxy = null }) => ApplyRequestTimeout(requestTimeoutMilliseconds);
+    public SseHttpClient(bool disableProxy, int? requestTimeoutMilliseconds = null) : base(new HttpClientHandler { UseProxy = !disableProxy, Proxy = null }) => ApplyRequestTimeout(requestTimeoutMilliseconds);
+    public SseHttpClient(HttpClientHandler httpClientHandler, int? requestTimeoutMilliseconds = null) : base(httpClientHandler) => ApplyRequestTimeout(requestTimeoutMilliseconds);
 
     void ApplyRequestTimeout(int? requestTimeoutMilliseconds)
     {
-        if (!requestTimeoutMilliseconds.HasValue) return;
-        int ms = requestTimeoutMilliseconds.Value;
-        Timeout = ms < 0 ? System.Threading.Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(ms);
+        if (requestTimeoutMilliseconds.HasValue)
+            Timeout = requestTimeoutMilliseconds < 0 ? System.Threading.Timeout.InfiniteTimeSpan : TimeSpan.FromMilliseconds(requestTimeoutMilliseconds.Value);
     }
 
     public async Task<StateSet<bool, Response>> CompletionsAsync(string url, Request request)
@@ -75,6 +63,8 @@ public class SseHttpClient : HttpClient
     }
     public async Task<StateSet<bool, Chunk[]>> CompletionsStreamAsync(string url, Request request, Func<StateSet<bool, Chunk>, Task> callback)
     {
+        int retryCount = 0;
+        retry:
         try
         {
             request.Stream = true;
@@ -136,6 +126,11 @@ public class SseHttpClient : HttpClient
         }
         catch (Exception ex)
         {
+            if (retryCount < 2)
+            {
+                retryCount++;
+                goto retry;
+            }
             await callback(false.ToStateSet<Chunk>(null, ex.Message));
             return false.ToStateSet<Chunk[]>(null, ex.Message);
         }

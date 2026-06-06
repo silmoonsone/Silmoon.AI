@@ -130,8 +130,10 @@ public class NativeChatClient : INativeChatClient
     }
     public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
-        chunks ??= [];
+        using var _ = await BusyAsyncLock.LockAsync();
+        BusyResetEvent.Reset();
         model ??= ModelName;
+        chunks ??= [];
         while (true)
         {
             var request = new Request(model, [.. messageHistory]);
@@ -204,6 +206,7 @@ public class NativeChatClient : INativeChatClient
             }
             else break;
         }
+        BusyResetEvent.Set();
     }
 
     public async Task<Response> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
