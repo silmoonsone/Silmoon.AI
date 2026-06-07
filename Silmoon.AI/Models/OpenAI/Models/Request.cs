@@ -24,11 +24,17 @@ public class Request
     [JsonProperty("reasoning_effort")]
     public string? ReasoningEffort { get; set; }
     [JsonProperty("enable_search")]
-    public bool EnableSearch { get; set; }
+    public bool? EnableSearch { get; set; }
     [JsonProperty("tools", NullValueHandling = NullValueHandling.Ignore)]
     public List<Tool> Tools { get; set; }
 
     public bool ShouldSerializeTools() => Tools != null && Tools.Count > 0;
+    public Request(string model, IMessage[] messages, bool stream = true)
+    {
+        Model = model;
+        Messages = messages;
+        Stream = stream;
+    }
 
     public void SetEnableThinking(bool enableThinking, string apiUrl, string provider, string modelName)
     {
@@ -59,12 +65,21 @@ public class Request
             }
         }
         else Thinking = false;
-    }
 
-    public Request(string model, IMessage[] messages, bool stream = true)
+        if (provider == "google")
+        {
+            Thinking = null;
+            ReasoningEffort = null;
+            EnableSearch = null;
+            EnableThinking = null;
+        }
+    }
+    public void SetEnableSearch(bool? enableSearch, string apiUrl, string provider, string modelName)
     {
-        Model = model;
-        Messages = messages;
-        Stream = stream;
+        EnableSearch = enableSearch;
+        if (provider == "google")
+        {
+            EnableSearch = null;
+        }
     }
 }

@@ -30,7 +30,7 @@ public class NativeChatClient : INativeChatClient
     public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
 
     public bool EnableThinking { get; set; } = false;
-    public bool EnableSearch { get; set; } = false;
+    public bool? EnableSearch { get; set; } = null;
     public List<IMessage> MessageHistory { get; set; } = [];
 
     public string SystemPrompt
@@ -138,7 +138,7 @@ public class NativeChatClient : INativeChatClient
         {
             var request = new Request(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
-            request.EnableSearch = EnableSearch;
+            request.SetEnableSearch(EnableSearch, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.Tools = tools ?? Tools;
 
 
@@ -174,8 +174,14 @@ public class NativeChatClient : INativeChatClient
             {
                 var result = Result.Create([.. chunkStates.Data], EnableThinking);
                 OnStreamOutputCompleted?.Invoke(result);
+                callTools:
                 if (result.FinishReason == "stop")
                 {
+                    if (!result.ToolCalls.IsNullOrEmpty())
+                    {
+                        result.FinishReason = "tool_calls";
+                        goto callTools;
+                    }
                     messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, reasoningContent: result.ReasoningContent));
                     break;
                 }
@@ -224,7 +230,7 @@ public class NativeChatClient : INativeChatClient
         {
             var request = new Request(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
-            request.EnableSearch = EnableSearch;
+            request.SetEnableSearch(EnableSearch, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.Tools = tools ?? Tools;
 
             var response = await HttpClient.CompletionsAsync(ModelProvider.ApiUrl + completionsUrl, request);
@@ -234,6 +240,7 @@ public class NativeChatClient : INativeChatClient
             //temp ignore this event.
             //OnNativeClientChatFinished?.Invoke(Result.Create(response.Data.Choices));
 
+            callTools:
             if (firstChoice?.FinishReason == "tool_calls")
             {
                 messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
@@ -258,6 +265,11 @@ public class NativeChatClient : INativeChatClient
             }
             else if (firstChoice?.FinishReason == "stop")
             {
+                if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
+                {
+                    firstChoice?.FinishReason = "tool_calls";
+                    goto callTools;
+                }
                 messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
             }
 
