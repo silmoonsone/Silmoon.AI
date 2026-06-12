@@ -68,7 +68,7 @@ public class SseHttpClient : HttpClient
         try
         {
             request.Stream = true;
-            var jsonString = request.ToJsonString(SerializerSettings);
+            var jsonString = request.ToJsonRequestString(SerializerSettings);
 
             //Console.WriteLine($"Request JSON: {jsonString}");
 

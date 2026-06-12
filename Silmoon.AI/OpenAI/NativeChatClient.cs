@@ -30,7 +30,6 @@ public class NativeChatClient : INativeChatClient
     public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
 
     public bool EnableThinking { get; set; } = false;
-    public bool? EnableSearch { get; set; } = null;
     public List<IMessage> MessageHistory { get; set; } = [];
 
     public string SystemPrompt
@@ -69,7 +68,7 @@ public class NativeChatClient : INativeChatClient
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public NativeChatClient(string apiUrl, string apiKey, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
+    public NativeChatClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
     {
     }
 
@@ -138,7 +137,6 @@ public class NativeChatClient : INativeChatClient
         {
             var request = new Request(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
-            request.SetEnableSearch(EnableSearch, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.Tools = tools ?? Tools;
 
 
@@ -230,7 +228,6 @@ public class NativeChatClient : INativeChatClient
         {
             var request = new Request(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
-            request.SetEnableSearch(EnableSearch, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.Tools = tools ?? Tools;
 
             var response = await HttpClient.CompletionsAsync(ModelProvider.ApiUrl + completionsUrl, request);

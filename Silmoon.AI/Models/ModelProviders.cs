@@ -20,12 +20,13 @@ namespace Silmoon.AI.Models
         [JsonProperty("models")]
         public List<Model> Models { get; set; } = [];
 
-        public static ModelProvider Create(string apiUrl, string apiKey, string modelName)
+        public static ModelProvider Create(string apiUrl, string apiKey, string providerName, string modelName)
         {
             return new ModelProvider
             {
                 ApiUrl = apiUrl,
                 ApiKey = apiKey,
+                ProviderName = providerName,
                 Models = [new Model { Name = modelName }]
             };
         }

@@ -1,5 +1,7 @@
 using System;
 using Newtonsoft.Json;
+using Newtonsoft.Json.Linq;
+using Silmoon.Extensions;
 
 namespace Silmoon.AI.Models.OpenAI.Models;
 
@@ -17,17 +19,10 @@ public class Request
     public double? TopP { get; set; }
     [JsonProperty("top_k")]
     public int? TopK { get; set; }
-    [JsonProperty("enable_thinking")]
-    public bool? EnableThinking { get; set; }
-    [JsonProperty("thinking")]
-    public object? Thinking { get; set; }
-    [JsonProperty("reasoning_effort")]
-    public string? ReasoningEffort { get; set; }
-    [JsonProperty("enable_search")]
-    public bool? EnableSearch { get; set; }
     [JsonProperty("tools", NullValueHandling = NullValueHandling.Ignore)]
     public List<Tool> Tools { get; set; }
-
+    [JsonIgnore]
+    public JObject ExtraBody { get; set; } = new JObject();
     public bool ShouldSerializeTools() => Tools != null && Tools.Count > 0;
     public Request(string model, IMessage[] messages, bool stream = true)
     {
@@ -41,45 +36,38 @@ public class Request
         apiUrl = apiUrl?.ToLower();
         modelName = modelName?.ToLower();
         provider = provider?.ToLower();
-        if (enableThinking)
+        if (apiUrl.Contains("aliyun"))
         {
-            EnableThinking = true;
-            ReasoningEffort = "high";
-        }
-        else
-        {
-            EnableThinking = false;
-            ReasoningEffort = "none";
+            ExtraBody["enable_thinking"] = enableThinking;
         }
 
         if (apiUrl.Contains("deepseek"))
         {
             if (enableThinking)
             {
-                Thinking = new { type = "enabled" };
+                ExtraBody["thinking"] = JObject.FromObject(new { type = "enabled" });
+                //ExtraBody["reasoning_effort"] = null;
             }
-            else
-            {
-                Thinking = new { type = "disabled" };
-                ReasoningEffort = null;
-            }
-        }
-        else Thinking = false;
-
-        if (provider == "google")
-        {
-            Thinking = null;
-            ReasoningEffort = null;
-            EnableSearch = null;
-            EnableThinking = null;
+            else ExtraBody["thinking"] = JObject.FromObject(new { type = "disabled" });
         }
     }
-    public void SetEnableSearch(bool? enableSearch, string apiUrl, string provider, string modelName)
+    public string ToJsonRequestString(JsonSerializerSettings settings = null)
     {
-        EnableSearch = enableSearch;
-        if (provider == "google")
+        settings ??= new JsonSerializerSettings()
         {
-            EnableSearch = null;
+            NullValueHandling = NullValueHandling.Ignore,
+            MissingMemberHandling = MissingMemberHandling.Ignore,
+            TypeNameHandling = TypeNameHandling.Auto,
+        };
+        var jsonObject = JObject.FromObject(this, JsonSerializer.Create(settings));
+        if (ExtraBody != null && ExtraBody.Count > 0)
+        {
+            jsonObject.Merge(ExtraBody, new JsonMergeSettings
+            {
+                MergeNullValueHandling = settings.NullValueHandling == NullValueHandling.Ignore ? MergeNullValueHandling.Ignore : MergeNullValueHandling.Merge,
+                MergeArrayHandling = MergeArrayHandling.Union
+            });
         }
+        return jsonObject.ToJsonString(settings);
     }
 }
