@@ -1,16 +1,10 @@
 ﻿using Newtonsoft.Json.Linq;
-using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Enums;
-using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.AI.Models.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
-using System;
-using System.Collections.Concurrent;
 using System.Collections.Generic;
 using System.IO;
-using System.Reflection.Metadata;
 using System.Text;
 
 namespace Silmoon.AI.Tools
@@ -22,29 +16,32 @@ namespace Silmoon.AI.Tools
 
         /// <summary>Underlying stream / <see cref="StreamReader"/> buffer size for line-scoped reads.</summary>
         const int ReadLinesStreamBufferSize = 65536;
+        const int MaxReadLines = 20_000;
 
         public override async Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await CallTool(toolCallParameter, toolCallResult);
         public override Tool[] GetTools()
         {
             return [
                 Tool.Create(FileFunctionName, """
-                Whole-file UTF-8 text only (configs/logs/source—not binary). `read` loads file; `write` full replace (create parent dirs first).
-                `read` → `Data` = file string; `write` → `Data` null. Returns `State`/`Message`/`Data`. Parallel unrelated paths only; same-file `write` then `read` must be ordered.
+                Whole-file UTF-8 text only (configs/logs/source—not binary). `read` loads file; `write` fully replaces/creates file and creates parent dirs.
+                Use the exact user-requested path; do not substitute another path after failure unless the user explicitly asks. For large/unknown-size files, preview with `File_ReadLines` before whole-file `read`.
+                `write` is full overwrite, not append/patch. `read` → `Data` = file string; `write` → `Data` null. Returns `State`/`Message`/`Data`. Parallel unrelated paths only; same-file `write` then `read` must be ordered.
                 """,
                 [
                     new ToolParameterProperty("string", "action", "`read` | `write` (full replace).", ["write", "read"], true),
                     new ToolParameterProperty("string", "path", "Target file path.", null, true),
-                    new ToolParameterProperty("string", "content", "Required. `write`: full new file body. `read`: unused—pass empty string.", null, true),
+                    new ToolParameterProperty("string", "content", "`write`: full new file body. `read`: unused/omit.", null, false),
                 ]),
                 Tool.Create(ReadLinesFunctionName, """
-                Read up to N UTF-8 lines (previews/logs/snippets; entire file → `File_File` `read`). Required `maxLines` ≥ 1.
+                Read up to N UTF-8 lines (previews/logs/snippets; entire file → `File_File` `read`). Required `maxLines` 1–20000.
+                Use the exact user-requested path; do not substitute another path after failure unless the user explicitly asks.
                 `direction` optional: `head` (default) = first N lines, `tail` = last N; shorter files → shorter `Data` array.
                 `Data`: string[] (one line per item, no trailing newlines). Returns `State`/`Message`/`Data`. Parallel unrelated files only.
                 """,
                 [
                     new ToolParameterProperty("string", "path", "Target file path.", null, true),
-                    new ToolParameterProperty("integer", "maxLines", "Line cap N (≥1); returns fewer if file is shorter.", null, true),
-                    new ToolParameterProperty("string", "direction", "`head` (default) | `tail`. Omit = `head`.", ["head", "tail"], false),
+                    new ToolParameterProperty("integer", "maxLines", "Line cap N (1–20000); returns fewer if file is shorter.", null, true),
+                    new ToolParameterProperty("string", "direction", "`head` (default) | `tail`. Case-insensitive; omit = `head`.", ["head", "tail"], false),
                 ])
             ];
         }
@@ -65,7 +62,6 @@ namespace Silmoon.AI.Tools
                         await NotifyToolExecuting(functionName, toolCallParameter);
                         var fileSystemResult = ExecuteTool(parameters["action"].Value<string>(), parameters["path"].Value<string>(), parameters["content"]?.Value<string>());
                         result = ToolCallResult.Create(toolCallParameter, fileSystemResult);
-                        await NotifyToolExecuted(functionName, toolCallParameter, result);
                     }
                     catch (Exception ex)
                     {
@@ -82,11 +78,10 @@ namespace Silmoon.AI.Tools
                         await NotifyToolExecuting(functionName, toolCallParameter);
                         var readLinesResult = ReadLines(parameters["path"].Value<string>(), parameters["maxLines"], parameters["direction"]?.Value<string>() ?? "head");
                         result = ToolCallResult.Create(toolCallParameter, readLinesResult);
-                        await NotifyToolExecuted(functionName, toolCallParameter, result);
                     }
                     catch (Exception ex)
                     {
-                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{FileFunctionName}] {ex.Message}"));
+                        result = ToolCallResult.Create(toolCallParameter, false.ToStateSet<object>(null, $"[{ReadLinesFunctionName}] {ex.Message}"));
                     }
                     finally
                     {
@@ -101,7 +96,8 @@ namespace Silmoon.AI.Tools
 
         StateSet<bool, object> ExecuteTool(string action, string path, string content)
         {
-            switch (action)
+            if (string.IsNullOrWhiteSpace(action)) return false.ToStateSet<object>(null, "action is required.");
+            switch (action.Trim().ToLowerInvariant())
             {
                 case "write":
                     return WriteFile(path, content);
@@ -117,7 +113,10 @@ namespace Silmoon.AI.Tools
         {
             try
             {
-                File.WriteAllText(path, content);
+                if (string.IsNullOrWhiteSpace(path)) return false.ToStateSet<object>(null, "path is required.");
+                var directory = Path.GetDirectoryName(Path.GetFullPath(path));
+                if (!string.IsNullOrEmpty(directory)) Directory.CreateDirectory(directory);
+                File.WriteAllText(path, content ?? string.Empty, Encoding.UTF8);
                 return true.ToStateSet<object>(null, "File written successfully.");
             }
             catch (Exception e)
@@ -129,10 +128,13 @@ namespace Silmoon.AI.Tools
         {
             try
             {
+                if (string.IsNullOrWhiteSpace(path)) return false.ToStateSet<object>(null, "path is required.");
 
                 if (File.Exists(path))
                 {
-                    string content = File.ReadAllText(path);
+                    using var fs = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.ReadWrite, bufferSize: ReadLinesStreamBufferSize, FileOptions.SequentialScan);
+                    using var reader = new StreamReader(fs, Encoding.UTF8, detectEncodingFromByteOrderMarks: true, bufferSize: ReadLinesStreamBufferSize);
+                    string content = reader.ReadToEnd();
                     return true.ToStateSet<object>(content);
                 }
                 else return false.ToStateSet<object>(null, message: $"File not found: {path}");
@@ -144,6 +146,7 @@ namespace Silmoon.AI.Tools
         }
         StateSet<bool, object> ReadLines(string path, JToken maxLinesToken, string direction)
         {
+            if (string.IsNullOrWhiteSpace(path)) return false.ToStateSet<object>(null, "path is required.");
             if (maxLinesToken is null || maxLinesToken.Type == JTokenType.Null)
                 return false.ToStateSet<object>(null, "maxLines is required.");
             int maxLines;
@@ -156,9 +159,10 @@ namespace Silmoon.AI.Tools
                 return false.ToStateSet<object>(null, "maxLines must be a number.");
             }
             if (maxLines < 1) return false.ToStateSet<object>(null, "maxLines must be >= 1.");
+            if (maxLines > MaxReadLines) return false.ToStateSet<object>(null, $"maxLines must be <= {MaxReadLines}.");
 
             if (string.IsNullOrWhiteSpace(direction)) direction = "head";
-            else direction = direction.Trim();
+            else direction = direction.Trim().ToLowerInvariant();
             if (direction is not ("head" or "tail")) return false.ToStateSet<object>(null, "direction must be `head` or `tail` when provided.");
 
             try

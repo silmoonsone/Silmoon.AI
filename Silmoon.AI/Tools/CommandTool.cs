@@ -40,18 +40,19 @@ namespace Silmoon.AI.Tools
         public const string TerminalPowerShell = "PowerShell";
         public const string TerminalBash = "Bash";
 
-        /// <summary>有状态 shell 全局单例：任意时刻最多一个持久进程；新 <c>instanceId</c> 的 Execute 会替换并结束旧会话。</summary>
+        /// <summary>有状态 shell 多实例表：instanceId 作为实例名，互相独立；同一实例内部串行执行。</summary>
         static readonly object StatefulCommandLock = new();
-        static string? ActiveStatefulInstanceId;
-        static StatefulTerminalSession? ActiveStatefulSession;
-        /// <summary>instanceId → 曾由 <see cref="CloseCommand"/> 主动关闭、或被新 instanceId 替换的时间（UTC）。</summary>
+        static readonly ConcurrentDictionary<string, StatefulTerminalSession> StatefulSessions = new();
+        /// <summary>instanceId → 曾由 <see cref="CloseCommand"/> 主动关闭、或退出后被同名实例替换的时间（UTC）。</summary>
         static readonly ConcurrentDictionary<string, DateTimeOffset> SessionClosedIntentionallyAt = new();
         const double TombstoneRetentionHours = 168; // 7 天后遗忘，避免字典无限增长
 
-        /// <summary>有状态工具族：同一轮助手回复中最多调用其中一个（禁止并行/批量）。</summary>
-        const string StatefulOnePerTurnRule =
-            "CRITICAL: Per assistant turn, call AT MOST ONE stateful tool (never 2+ in parallel/batch). " +
-            "Forbidden: Execute+GetOutput together, or any mix in one turn. Wait for result, then next turn.";
+        /// <summary>有状态工具族多实例使用规则。</summary>
+        const string StatefulMultiInstanceRule =
+            "Stateful shells are multi-instance: `instanceId` is the stable shell name. " +
+            "Use them only when you need shared cwd/env, a long-running process, an interactive session, or parallel named tasks; otherwise prefer Command_Run. " +
+            "Different instanceIds can run independent long-lived shells; reuse the same id to keep cwd/env. " +
+            "Operations on the same instance are serialized. Close instances when done. Use GetSessionStatus with empty/omitted instanceId to list instances.";
 
         public override async Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await ToolCall(toolCallParameter, toolCallResult);
 
@@ -63,8 +64,8 @@ namespace Silmoon.AI.Tools
                 Tool.Create(CommandFunctionName, $"""
                 Stateless one-shot shell (new process; no cwd/env carry-over). Hard timeout {MaxStatelessTimeoutMs / 1000}s.
                 Use: independent short commands. Not for: same-shell chains, streaming/long jobs, cwd/env-dependent steps → `{StatefulExecuteFunctionName}`.
-                Stateful tools ({statefulTools}) are NEVER parallel—one per turn only (see each stateful tool).
-                Prefer specialized tools over shell when they fit. Parallel if independent; serial if dependent.
+                Stateful tools ({statefulTools}) support multiple named shell instances via `instanceId`.
+                Prefer specialized tools over shell when they fit. Parallel if independent; serial if dependent. Large/streaming output should use stateful tools and polling.
                 Returns `State`/`Message`/`Data`; check `State` before using output. No destructive ops without user approval.
                 """,
                 [
@@ -73,47 +74,45 @@ namespace Silmoon.AI.Tools
                     new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or omit.", ["CMD", "PowerShell", "Bash", null], true),
                 ]),
                 Tool.Create(StatefulExecuteFunctionName, $"""
-                {StatefulOnePerTurnRule}
-                Stateful shell (global singleton) for dependent multi-step work (shared cwd/env/ssh).
-                This turn: call ONLY `{StatefulExecuteFunctionName}` OR wait for a later turn for GetOutput/Status/Close—never both.
-                Keep one stable instanceId per task; new instanceId replaces the active shell.
-                Flow: Execute → (next turn) GetOutput → … → Close when done.
+                {StatefulMultiInstanceRule}
+                Execute one command in a named persistent shell. If `instanceId` does not exist, it starts a new shell; if it exists, it reuses that shell.
+                Use separate instanceIds for independent services/tasks/directories/ssh sessions. Use one stable instanceId per task.
+                Flow per instance: Execute → GetOutput as needed → more Execute/GetOutput → Close when done.
                 Timing: `timeoutMilliseconds` max wait (default {DefaultStatefulTimeoutMs}, cap {MaxStatefulTimeoutMs}); `idleCompletionMilliseconds` silence-after-output for early return (default {DefaultIdleCompletionMs}). Still running at timeout → next-turn GetOutput.
-                One single-line command per call. Returns `State`/`Message`/`Data`.
+                One shell input line per call; shell syntax such as `&&`, pipes, loops, and redirects is allowed when needed. Returns `State`/`Message`/`Data`.
                 """,
                 [
                     new ToolParameterProperty("string", "instanceId", "Stable id for this task; reuse across stateful calls.", null, true),
                     new ToolParameterProperty("string", "os", "Windows|MacOS|Linux.", ["Windows", "MacOS", "Linux"], true),
-                    new ToolParameterProperty("string", "command", "Single line; no chaining.", null, true),
+                    new ToolParameterProperty("string", "command", "One shell input line. Shell syntax is allowed when needed.", null, true),
                     new ToolParameterProperty("string", "terminalType", "Windows: CMD|PowerShell. Mac/Linux: Bash or empty.", ["CMD", "PowerShell", "Bash", null], true),
-                    new ToolParameterProperty("integer", "timeoutMilliseconds", $"Max wait ms (default {DefaultStatefulTimeoutMs}, cap {MaxStatefulTimeoutMs}).", null, true),
+                    new ToolParameterProperty("integer", "timeoutMilliseconds", $"Max wait ms (default {DefaultStatefulTimeoutMs}, cap {MaxStatefulTimeoutMs}).", null, false),
                     new ToolParameterProperty("integer", "idleCompletionMilliseconds", $"Silence-after-output ms for early return (default {DefaultIdleCompletionMs}).", null, false),
                 ]),
                 Tool.Create(StatefulGetOutputFunctionName, $"""
-                {StatefulOnePerTurnRule}
-                Poll new stdout/stderr since last Execute/GetOutput. Same instanceId as Execute.
-                Do NOT call in the same turn as Execute—wait for Execute result first.
-                `waitMilliseconds`: pre-read delay, 0=now (max {MaxStatefulTimeoutMs}). Returns `State`/`Message`/`Data`.
+                {StatefulMultiInstanceRule}
+                Poll new stdout/stderr since last Execute/GetOutput for the named shell instance.
+                `waitMilliseconds`: pre-read delay, 0=now (max {MaxStatefulTimeoutMs}); use a small wait for streaming commands. Returns `State`/`Message`/`Data`.
                 """,
                 [
-                    new ToolParameterProperty("string", "instanceId", "Same as active Execute session.", null, true),
+                    new ToolParameterProperty("string", "instanceId", "Named shell instance to read.", null, true),
                     new ToolParameterProperty("integer", "waitMilliseconds", $"Pre-read ms (0=now, max {MaxStatefulTimeoutMs}).", null, false),
                 ]),
                 Tool.Create(StatefulGetSessionStatusFunctionName, $"""
-                {StatefulOnePerTurnRule}
-                Check shell session alive only (no command, no output). Wrong id → active id hint.
+                {StatefulMultiInstanceRule}
+                Check shell sessions without reading output. Omit or pass empty `instanceId` to list all named instances; pass one id for details.
                 Returns `State`/`Message`/`Data`.
                 """,
                 [
-                    new ToolParameterProperty("string", "instanceId", "Believed active id.", null, true),
+                    new ToolParameterProperty("string", "instanceId", "Optional named shell instance. Empty/omitted lists all instances.", null, false),
                 ]),
                 Tool.Create(StatefulCloseFunctionName, $"""
-                {StatefulOnePerTurnRule}
-                Close stateful session when user asks or all shell work is finished.
+                {StatefulMultiInstanceRule}
+                Close the named stateful shell instance when user asks or that shell work is finished. Other instances remain running.
                 Returns `State`/`Message`/`Data`.
                 """,
                 [
-                    new ToolParameterProperty("string", "instanceId", "Active session id to close.", null, true),
+                    new ToolParameterProperty("string", "instanceId", "Named shell instance to close.", null, true),
                 ]),
             ];
         }
@@ -254,6 +253,9 @@ namespace Silmoon.AI.Tools
         static StateSet<bool, string> RunStatelessProcess(ProcessStartInfo psi, string startFailureMessage)
         {
             using var process = Process.Start(psi) ?? throw new InvalidOperationException(startFailureMessage);
+            var outputTask = process.StandardOutput.ReadToEndAsync();
+            var errorTask = process.StandardError.ReadToEndAsync();
+
             if (!process.WaitForExit(MaxStatelessTimeoutMs))
             {
                 try
@@ -265,7 +267,13 @@ namespace Silmoon.AI.Tools
                 return false.ToStateSet<string>(null, $"[{CommandFunctionName}] 命令执行超时（>{MaxStatelessTimeoutMs}ms），进程已终止。");
             }
 
-            return true.ToStateSet<string>(CombineProcessOutput(process));
+            try
+            {
+                Task.WaitAll([outputTask, errorTask], 5000);
+            }
+            catch { }
+
+            return true.ToStateSet<string>(CombineProcessOutput(outputTask, errorTask));
         }
 
         static StateSet<bool, string> Execute(string os, string command, string terminalType)
@@ -284,40 +292,52 @@ namespace Silmoon.AI.Tools
                     throw new NotSupportedException($"Unsupported operating system: {os}");
             }
         }
-        static StateSet<bool, string> ExecuteCmd(string command) => RunStatelessProcess(
-            new ProcessStartInfo("cmd.exe", $"/c {command}")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
-            "无法启动 cmd.exe");
-
-        static StateSet<bool, string> ExecutePowerShell(string command) => RunStatelessProcess(
-            new ProcessStartInfo("powershell.exe", $"-Command {command}")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
-            "无法启动 powershell.exe");
-
-        static StateSet<bool, string> ExecuteBash(string command) => RunStatelessProcess(
-            new ProcessStartInfo("/bin/bash", $"-c \"{command}\"")
-            {
-                RedirectStandardOutput = true,
-                RedirectStandardError = true,
-                UseShellExecute = false,
-                CreateNoWindow = true,
-            },
-            "无法启动 /bin/bash");
-
-        static string CombineProcessOutput(Process process)
+        static StateSet<bool, string> ExecuteCmd(string command)
         {
-            string output = process.StandardOutput.ReadToEnd();
-            string error = process.StandardError.ReadToEnd();
+            var psi = new ProcessStartInfo("cmd.exe")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.ArgumentList.Add("/c");
+            psi.ArgumentList.Add(command);
+            return RunStatelessProcess(psi, "无法启动 cmd.exe");
+        }
+
+        static StateSet<bool, string> ExecutePowerShell(string command)
+        {
+            var psi = new ProcessStartInfo("powershell.exe")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.ArgumentList.Add("-Command");
+            psi.ArgumentList.Add(command);
+            return RunStatelessProcess(psi, "无法启动 powershell.exe");
+        }
+
+        static StateSet<bool, string> ExecuteBash(string command)
+        {
+            var psi = new ProcessStartInfo("/bin/bash")
+            {
+                RedirectStandardOutput = true,
+                RedirectStandardError = true,
+                UseShellExecute = false,
+                CreateNoWindow = true,
+            };
+            psi.ArgumentList.Add("-c");
+            psi.ArgumentList.Add(command);
+            return RunStatelessProcess(psi, "无法启动 /bin/bash");
+        }
+
+        static string CombineProcessOutput(Task<string> outputTask, Task<string> errorTask)
+        {
+            string output = outputTask.IsCompletedSuccessfully ? outputTask.Result : string.Empty;
+            string error = errorTask.IsCompletedSuccessfully ? errorTask.Result : string.Empty;
             if (string.IsNullOrEmpty(output)) return error;
             if (string.IsNullOrEmpty(error)) return output;
             return output + Environment.NewLine + error;
@@ -354,8 +374,8 @@ namespace Silmoon.AI.Tools
         }
 
         /// <summary>
-        /// 在持久化 shell 中执行命令。有状态模式为<strong>全局单例</strong>：同时只存在一个持久 shell；
-        /// 使用新的 <paramref name="instanceId"/> 时会结束并替换此前的 shell（旧 id 记入 tombstone）。
+        /// 在指定名称的持久化 shell 中执行命令。不同 <paramref name="instanceId"/> 对应不同 shell 实例；
+        /// 同一实例保留 cwd/env 并串行执行。
         /// 超时不会结束子进程，只返回当前已累计的全部终端输出。
         /// </summary>
         /// <param name="timeoutMilliseconds">等待该命令输出的最长时间（毫秒）。输出静默达到 idleCompletionMilliseconds 时提前返回；否则超时返回。</param>
@@ -369,55 +389,37 @@ namespace Silmoon.AI.Tools
             {
                 var osNorm = NormalizeOs(os);
                 var terminalNorm = NormalizeTerminal(terminalType, osNorm);
-                string? supersededId = null;
                 StatefulTerminalSession session;
+                instanceId = instanceId.Trim();
 
                 lock (StatefulCommandLock)
                 {
                     PruneStaleTombstones();
 
-                    if (ActiveStatefulSession != null && !string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal))
+                    if (StatefulSessions.TryGetValue(instanceId, out var existingSession) && existingSession.IsShellProcessExited)
                     {
-                        supersededId = ActiveStatefulInstanceId;
-                        DisposeActiveStatefulSessionAndRecordTombstone(supersededId!, ActiveStatefulSession);
-                        ActiveStatefulSession = null;
-                        ActiveStatefulInstanceId = null;
+                        DisposeStatefulSessionAndRecordTombstone(instanceId, existingSession);
+                        StatefulSessions.TryRemove(instanceId, out StatefulTerminalSession _);
+                        existingSession = null;
                     }
 
-                    if (ActiveStatefulSession != null && string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal) && ActiveStatefulSession.IsShellProcessExited)
-                    {
-                        DisposeActiveStatefulSessionAndRecordTombstone(instanceId, ActiveStatefulSession);
-                        ActiveStatefulSession = null;
-                        ActiveStatefulInstanceId = null;
-                    }
-
-                    if (ActiveStatefulSession != null && string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal)
-                        && !ActiveStatefulSession.MatchesEnvironment(osNorm, terminalNorm))
+                    if (existingSession != null && !existingSession.MatchesEnvironment(osNorm, terminalNorm))
                     {
                         return false.ToStateSet<string>(null,
-                            $"[{StatefulExecuteFunctionName}] 当前会话环境为 {ActiveStatefulSession.Os}/{ActiveStatefulSession.TerminalType}，与请求的 {osNorm}/{terminalNorm} 不一致。请 Close 后重建，或使用新 instanceId。");
+                            $"[{StatefulExecuteFunctionName}] instanceId \"{instanceId}\" 的当前会话环境为 {existingSession.Os}/{existingSession.TerminalType}，与请求的 {osNorm}/{terminalNorm} 不一致。请 Close 后重建，或使用新的 instanceId。");
                     }
 
-                    if (ActiveStatefulSession == null)
+                    if (existingSession == null)
                     {
                         SessionClosedIntentionallyAt.TryRemove(instanceId, out DateTimeOffset _);
-                        ActiveStatefulSession = StatefulTerminalSession.Start(osNorm, terminalNorm);
-                        ActiveStatefulInstanceId = instanceId;
+                        existingSession = StatefulTerminalSession.Start(osNorm, terminalNorm);
+                        StatefulSessions[instanceId] = existingSession;
                     }
 
-                    session = ActiveStatefulSession;
+                    session = existingSession;
                 }
 
                 var output = session.ExecuteCommand(osNorm, command, terminalNorm, timeoutMilliseconds, idleCompletionMilliseconds);
-                if (supersededId is not null)
-                {
-                    output = $"""
-                        [{StatefulExecuteFunctionName}] 有状态 shell 为全局单例：已结束并替换此前的实例（旧 instanceId: {supersededId}）。当前活跃 instanceId: {instanceId}。
-
-                        {output}
-                        """;
-                }
-
                 return true.ToStateSet<string>(output);
             }
             catch (Exception ex)
@@ -435,7 +437,8 @@ namespace Silmoon.AI.Tools
             if (string.IsNullOrWhiteSpace(instanceId))
                 return false.ToStateSet<string>(null, $"[{StatefulGetOutputFunctionName}] instanceId 不能为空。");
 
-            if (!TryResolveActiveStatefulSession(instanceId, out var session, out var resolveMsg))
+            instanceId = instanceId.Trim();
+            if (!TryResolveStatefulSession(instanceId, out var session, out var resolveMsg, StatefulGetOutputFunctionName))
                 return false.ToStateSet<string>(null, resolveMsg!);
 
             try
@@ -456,69 +459,59 @@ namespace Silmoon.AI.Tools
             if (string.IsNullOrWhiteSpace(instanceId))
                 return false.ToStateSet<string>(null, $"[{StatefulCloseFunctionName}] instanceId 不能为空。");
 
+            instanceId = instanceId.Trim();
             lock (StatefulCommandLock)
             {
-                if (ActiveStatefulSession == null)
-                    return false.ToStateSet<string>(null, $"[{StatefulCloseFunctionName}] 当前没有活跃的有状态 shell。");
-
-                if (!string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal))
-                    return false.ToStateSet<string>(null, $"[{StatefulCloseFunctionName}] instanceId 不匹配。当前活跃 instanceId: \"{ActiveStatefulInstanceId}\"。");
+                StatefulTerminalSession session;
+                if (!StatefulSessions.TryRemove(instanceId, out session))
+                    return false.ToStateSet<string>(null, BuildNoMatchingSessionMessage(StatefulCloseFunctionName, instanceId));
 
                 SessionClosedIntentionallyAt[instanceId] = DateTimeOffset.UtcNow;
+
                 try
                 {
-                    ActiveStatefulSession.Dispose();
+                    session.Dispose();
                 }
                 catch
                 {
                     // 忽略关闭时的清理异常
                 }
-
-                ActiveStatefulSession = null;
-                ActiveStatefulInstanceId = null;
             }
 
-            return true.ToStateSet<string>($"{StatefulCloseFunctionName}: session closed.");
+            return true.ToStateSet<string>($"{StatefulCloseFunctionName}: session \"{instanceId}\" closed.");
         }
 
         /// <summary>
-        /// 查询某 <paramref name="instanceId"/> 对应的有状态 shell 是否存在、是否在运行、是否已异常退出，
+        /// 查询所有有状态 shell，或查询某 <paramref name="instanceId"/> 对应的 shell 是否存在、是否在运行、是否已异常退出，
         /// 或是否曾由 <see cref="CloseCommand"/> 主动关闭（与「从未创建」区分）。
         /// </summary>
         static StateSet<bool, string> GetShellSessionStatus(string instanceId)
         {
-            if (string.IsNullOrWhiteSpace(instanceId))
-                return false.ToStateSet<string>(null, $"[{StatefulGetSessionStatusFunctionName}] instanceId 不能为空。");
-
             PruneStaleTombstones();
+            if (string.IsNullOrWhiteSpace(instanceId))
+                return true.ToStateSet<string>(DescribeAllStatefulSessions());
+
+            instanceId = instanceId.Trim();
             lock (StatefulCommandLock)
             {
-                if (ActiveStatefulSession != null)
-                {
-                    if (string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal))
-                        return true.ToStateSet<string>(ActiveStatefulSession.DescribeSessionStatus());
-
-                    return true.ToStateSet<string>($"""
-                        [{StatefulGetSessionStatusFunctionName}: 会话状态]
-                        有状态模式为全局单例。当前活跃 instanceId: "{ActiveStatefulInstanceId}"（与查询的 "{instanceId}" 不一致）。
-                        说明: 仅存在一个持久 shell；请对上述活跃 id 调用 GetOutput/Close，或 Execute 使用新 id 以替换当前 shell。
-                        """);
-                }
+                if (StatefulSessions.TryGetValue(instanceId, out var session))
+                    return true.ToStateSet<string>(session.DescribeSessionStatus(instanceId));
             }
 
             if (SessionClosedIntentionallyAt.TryGetValue(instanceId, out var closedAt))
                 return true.ToStateSet<string>($"""
                     [{StatefulGetSessionStatusFunctionName}: 会话状态]
                     instanceId: {instanceId}
-                    状态: 会话已结束（主动 {StatefulCloseFunctionName}，或已被新的有状态 instanceId 替换）。非异常崩溃记录。
+                    状态: 会话已结束（主动 {StatefulCloseFunctionName}，或退出后已被同名实例替换）。非异常崩溃记录。
                     结束时间 (UTC): {closedAt:O}
-                    说明: 全局仅允许一个有状态 shell；再次 Execute 可新建（可沿用本 id 或新 id，新 Execute 会占用唯一槽位）。
+                    说明: 再次 Execute 可用此 instanceId 新建同名 shell；其他命名实例不受影响。
                     """);
 
             return true.ToStateSet<string>($"""
                 [{StatefulGetSessionStatusFunctionName}: 会话状态]
                 instanceId: {instanceId}
                 状态: 当前无匹配记录（可能从未创建、id 拼写错误，或 tombstone 已超过保留时间）。
+                当前实例: {FormatActiveSessionIds()}
                 说明: 请先 {StatefulExecuteFunctionName}，或确认 instanceId。
                 """);
         }
@@ -532,7 +525,7 @@ namespace Silmoon.AI.Tools
                     SessionClosedIntentionallyAt.TryRemove(key, out DateTimeOffset _);
             }
         }
-        static void DisposeActiveStatefulSessionAndRecordTombstone(string instanceId, StatefulTerminalSession session)
+        static void DisposeStatefulSessionAndRecordTombstone(string instanceId, StatefulTerminalSession session)
         {
             SessionClosedIntentionallyAt[instanceId] = DateTimeOffset.UtcNow;
             try
@@ -545,29 +538,68 @@ namespace Silmoon.AI.Tools
             }
         }
 
-        /// <summary>在持锁或调用方已确认 id 时使用：解析当前唯一有状态会话。</summary>
-        static bool TryResolveActiveStatefulSession(string instanceId, out StatefulTerminalSession? session, out string? errorMessage)
+        static bool TryResolveStatefulSession(string instanceId, out StatefulTerminalSession? session, out string? errorMessage, string callerFunctionName)
         {
             session = null;
             errorMessage = null;
             lock (StatefulCommandLock)
             {
-                if (ActiveStatefulSession == null)
+                if (!StatefulSessions.TryGetValue(instanceId, out session))
                 {
-                    errorMessage = $"[{StatefulGetOutputFunctionName}] 当前没有活跃的有状态 shell，请先 {StatefulExecuteFunctionName}。查询的 instanceId: \"{instanceId}\"。";
+                    errorMessage = BuildNoMatchingSessionMessage(callerFunctionName, instanceId);
                     return false;
                 }
-
-                if (!string.Equals(ActiveStatefulInstanceId, instanceId, StringComparison.Ordinal))
-                {
-                    errorMessage = $"""
-                        [{StatefulGetOutputFunctionName}] 有状态 shell 为全局单例。当前活跃 instanceId 为 "{ActiveStatefulInstanceId}"，与 "{instanceId}" 不一致。请使用活跃 id 操作，或 Execute 新 id 以替换当前 shell。
-                        """;
-                    return false;
-                }
-
-                session = ActiveStatefulSession;
                 return true;
+            }
+        }
+
+        static string BuildNoMatchingSessionMessage(string callerFunctionName, string instanceId)
+        {
+            if (SessionClosedIntentionallyAt.TryGetValue(instanceId, out var closedAt))
+                return $"""
+                    [{callerFunctionName}] instanceId "{instanceId}" 对应的有状态 shell 已结束。
+                    结束时间 (UTC): {closedAt:O}
+                    当前实例: {FormatActiveSessionIds()}
+                    """;
+
+            return $"""
+                [{callerFunctionName}] 找不到 instanceId "{instanceId}" 对应的有状态 shell。
+                当前实例: {FormatActiveSessionIds()}
+                可用 {StatefulGetSessionStatusFunctionName}（不传 instanceId）查看全部实例。
+                """;
+        }
+
+        static string FormatActiveSessionIds()
+        {
+            var ids = StatefulSessions.Keys.OrderBy(x => x, StringComparer.Ordinal).ToArray();
+            return ids.Length == 0 ? "(无)" : string.Join(", ", ids.Select(x => $"\"{x}\""));
+        }
+
+        static string DescribeAllStatefulSessions()
+        {
+            lock (StatefulCommandLock)
+            {
+                var sb = new StringBuilder();
+                sb.AppendLine($"[{StatefulGetSessionStatusFunctionName}: 会话列表]");
+                if (StatefulSessions.IsEmpty)
+                {
+                    sb.AppendLine("当前没有运行中的有状态 shell 实例。");
+                }
+                else
+                {
+                    foreach (var item in StatefulSessions.OrderBy(x => x.Key, StringComparer.Ordinal))
+                        sb.AppendLine(item.Value.DescribeSessionSummary(item.Key));
+                }
+
+                if (!SessionClosedIntentionallyAt.IsEmpty)
+                {
+                    sb.AppendLine();
+                    sb.AppendLine($"最近结束的实例（保留 {TombstoneRetentionHours:g} 小时）:");
+                    foreach (var item in SessionClosedIntentionallyAt.OrderBy(x => x.Key, StringComparer.Ordinal))
+                        sb.AppendLine($"- instanceId: {item.Key}; endedAtUtc: {item.Value:O}");
+                }
+
+                return sb.ToString();
             }
         }
 
@@ -586,7 +618,7 @@ namespace Silmoon.AI.Tools
             internal bool MatchesEnvironment(string os, string terminalType) =>
                 string.Equals(Os, os, StringComparison.Ordinal) && string.Equals(TerminalType, terminalType, StringComparison.Ordinal);
 
-            /// <summary>底层 shell 是否已结束（用于全局单例槽位回收）。</summary>
+            /// <summary>底层 shell 是否已结束（同名 Execute 会回收后重建）。</summary>
             internal bool IsShellProcessExited => _disposed || _process is null || _process.HasExited;
 
             Process? _process;
@@ -767,7 +799,25 @@ namespace Silmoon.AI.Tools
             }
 
             /// <summary>供 <see cref="CommandTool.GetShellSessionStatus"/> 使用，不消费增量输出游标。</summary>
-            public string DescribeSessionStatus()
+            public string DescribeSessionSummary(string instanceId)
+            {
+                var p = _process;
+                if (p is null)
+                    return $"- instanceId: {instanceId}; 状态: 内部错误（进程句柄不可用）; 环境: {Os}/{TerminalType}";
+
+                try
+                {
+                    return p.HasExited
+                        ? $"- instanceId: {instanceId}; 状态: 已退出; exitCode: {p.ExitCode}; 环境: {Os}/{TerminalType}"
+                        : $"- instanceId: {instanceId}; 状态: 运行中; PID: {p.Id}; 环境: {Os}/{TerminalType}";
+                }
+                catch (InvalidOperationException)
+                {
+                    return $"- instanceId: {instanceId}; 状态: 无法读取进程状态; 环境: {Os}/{TerminalType}";
+                }
+            }
+
+            public string DescribeSessionStatus(string instanceId)
             {
                 ThrowIfDisposed();
                 var p = _process;
@@ -775,6 +825,7 @@ namespace Silmoon.AI.Tools
                 {
                     return $"""
                         [{StatefulGetSessionStatusFunctionName}: 会话状态]
+                        instanceId: {instanceId}
                         状态: 内部错误（进程句柄不可用）。
                         """;
                 }
@@ -785,6 +836,7 @@ namespace Silmoon.AI.Tools
                     {
                         return $"""
                             [{StatefulGetSessionStatusFunctionName}: 会话状态]
+                            instanceId: {instanceId}
                             状态: 运行中（活跃 shell，可继续 Execute / GetOutput）。
                             PID: {p.Id}
                             环境: {Os}/{TerminalType}
@@ -794,15 +846,18 @@ namespace Silmoon.AI.Tools
 
                     return $"""
                         [{StatefulGetSessionStatusFunctionName}: 会话状态]
+                        instanceId: {instanceId}
                         状态: 子进程已退出（非 Close 路径下 shell 自行结束，或未通过 Close 即崩溃/退出）。
                         退出码: {p.ExitCode}
-                        说明: 全局仅一个有状态 shell；进程已退出后请再次 Execute（可沿用或更换 instanceId，新 Execute 会占用唯一槽位）以启动新 shell。
+                        环境: {Os}/{TerminalType}
+                        说明: 进程已退出后请再次 Execute（可沿用此 instanceId 或更换 instanceId）以启动 shell。
                         """;
                 }
                 catch (InvalidOperationException)
                 {
                     return $"""
                         [{StatefulGetSessionStatusFunctionName}: 会话状态]
+                        instanceId: {instanceId}
                         状态: 无法读取进程状态（进程句柄可能已失效）。
                         """;
                 }

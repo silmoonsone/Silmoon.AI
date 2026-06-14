@@ -126,7 +126,7 @@ public class SseHttpClient : HttpClient
         }
         catch (Exception ex)
         {
-            if (retryCount < 2)
+            if (retryCount < 5)
             {
                 retryCount++;
                 goto retry;
