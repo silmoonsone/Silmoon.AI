@@ -34,7 +34,7 @@ public class SseHttpClient : HttpClient
             request.Stream = false;
             List<Chunk> chunks = [];
             using var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-            var jsonString = request.ToJsonString(SerializerSettings);
+            var jsonString = request.ToJsonRequestString(SerializerSettings);
 
             //Console.WriteLine($"Request JSON: {jsonString}\r\n");
 

@@ -50,6 +50,16 @@ public class Request
             }
             else ExtraBody["thinking"] = JObject.FromObject(new { type = "disabled" });
         }
+
+        //if (provider == "lmstudio")
+        //{
+        //    if (enableThinking)
+        //    {
+        //        ExtraBody["thinking"] = JObject.FromObject(new { type = "enabled" });
+        //        //ExtraBody["reasoning_effort"] = null;
+        //    }
+        //    else ExtraBody["thinking"] = JObject.FromObject(new { type = "disabled" });
+        //}
     }
     public string ToJsonRequestString(JsonSerializerSettings settings = null)
     {
