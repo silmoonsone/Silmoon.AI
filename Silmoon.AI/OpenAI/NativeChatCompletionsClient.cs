@@ -1,8 +1,8 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Silmoon.AI.Models.OpenAI.Enums;
-using Silmoon.AI.Models.OpenAI.Interfaces;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
+using Silmoon.AI.Interfaces;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System.Threading.Channels;
@@ -13,7 +13,7 @@ using Silmoon.Threading;
 
 namespace Silmoon.AI.OpenAI;
 
-public class NativeChatClient : INativeChatClient
+public class NativeChatCompletionsClient : INativeChatClient
 {
     public event ToolCallsStartHandler OnToolCallsStart;
     public event ToolCallInvokeHandler OnToolCallInvoke;
@@ -24,7 +24,7 @@ public class NativeChatClient : INativeChatClient
     public event StreamOutputCompletedHandler OnStreamOutputCompleted;
     public ModelProvider ModelProvider { get; set; }
     public string ModelName { get; set; }
-    SseHttpClient HttpClient { get; set; }
+    ChatCompletionsHttpClient HttpClient { get; set; }
     public ExecuteToolManager ExecuteToolManager { get; set; }
     public ManualResetEvent BusyResetEvent { get; private set; } = new ManualResetEvent(true);
     public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
@@ -51,7 +51,7 @@ public class NativeChatClient : INativeChatClient
     }
     public List<Tool> Tools { get; set; } = [];
 
-    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public NativeChatCompletionsClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
     {
         ModelProvider = provider;
         ModelName = modelName;
@@ -68,14 +68,14 @@ public class NativeChatClient : INativeChatClient
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public NativeChatClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
+    public NativeChatCompletionsClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
     {
     }
 
     void BuildHttpClient(bool disableProxy, int? httpRequestTimeoutMilliseconds)
     {
         HttpClient?.Dispose();
-        HttpClient = new SseHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
+        HttpClient = new ChatCompletionsHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
     public void RebuildHttpClient()
@@ -112,14 +112,14 @@ public class NativeChatClient : INativeChatClient
         }
     }
 
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(string content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
         {
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(IMessage content, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(IMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
@@ -127,7 +127,7 @@ public class NativeChatClient : INativeChatClient
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, Chunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<Chunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -135,12 +135,12 @@ public class NativeChatClient : INativeChatClient
         chunks ??= [];
         while (true)
         {
-            var request = new Request(model, [.. messageHistory]);
+            var request = new ChatCompletionsRequest(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.Tools = tools ?? Tools;
 
 
-            Channel<StateSet<bool, Chunk>> channel = Channel.CreateUnbounded<StateSet<bool, Chunk>>();
+            Channel<StateSet<bool, ChatCompletionsChunk>> channel = Channel.CreateUnbounded<StateSet<bool, ChatCompletionsChunk>>();
             bool channelClosed = false;
             var callbackTask = HttpClient.CompletionsStreamAsync(ModelProvider.ApiUrl + completionsUrl, request, async (chunkState) =>
             {
@@ -213,26 +213,26 @@ public class NativeChatClient : INativeChatClient
         BusyResetEvent.Set();
     }
 
-    public async Task<Response> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
-    public async Task<Response> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
+    public async Task<ChatCompletionsResponse> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<Response> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<ChatCompletionsResponse> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
         model ??= ModelName;
         while (true)
         {
-            var request = new Request(model, [.. messageHistory]);
+            var request = new ChatCompletionsRequest(model, [.. messageHistory]);
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.Tools = tools ?? Tools;
 
             var response = await HttpClient.CompletionsAsync(ModelProvider.ApiUrl + completionsUrl, request);
 
-            Choice firstChoice = response.Data.Choices.FirstOrDefault();
+            ChatCompletionsChoice firstChoice = response.Data.Choices.FirstOrDefault();
 
             //temp ignore this event.
             //OnNativeClientChatFinished?.Invoke(Result.Create(response.Data.Choices));
@@ -295,3 +295,18 @@ public class NativeChatClient : INativeChatClient
         BusyAsyncLock.Dispose();
     }
 }
+
+[Obsolete("Use NativeChatCompletionsClient. This name is kept only for compatibility.")]
+public class NativeChatClient : NativeChatCompletionsClient
+{
+    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+        : base(provider, modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
+    {
+    }
+
+    public NativeChatClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+        : base(apiUrl, apiKey, providerName, modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
+    {
+    }
+}
+

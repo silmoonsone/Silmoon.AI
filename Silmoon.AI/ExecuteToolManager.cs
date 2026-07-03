@@ -1,6 +1,5 @@
 ﻿using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Interfaces;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
@@ -81,3 +80,4 @@ namespace Silmoon.AI
         }
     }
 }
+

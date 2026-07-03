@@ -1,9 +1,9 @@
-using System;
+﻿using System;
 using Newtonsoft.Json;
 
-namespace Silmoon.AI.Models.OpenAI.Models;
+namespace Silmoon.AI.OpenAI.Models;
 
-public class Choice
+public class ChatCompletionsChoice
 {
     [JsonProperty("message")]
     public MessageContent Message { get; set; }
@@ -12,3 +12,9 @@ public class Choice
     [JsonProperty("index")]
     public int Index { get; set; }
 }
+
+[Obsolete("Use ChatCompletionsChoice. This alias is kept for source compatibility.")]
+public class Choice : ChatCompletionsChoice
+{
+}
+

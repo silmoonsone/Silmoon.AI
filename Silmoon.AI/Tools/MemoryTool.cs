@@ -2,8 +2,7 @@
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Interfaces;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.AI.Prompts;
 using Silmoon.Extensions;
 using Silmoon.Models;
@@ -357,3 +356,4 @@ public class MemoryTool : ExecuteTool
             """;
 
 }
+

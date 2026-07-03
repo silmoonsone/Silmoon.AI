@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.Hosting;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Enums;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.AI.OpenAI;
 using Silmoon.AI.Prompts;
 using Silmoon.Extensions;
@@ -15,7 +15,7 @@ namespace Silmoon.AI.Terminal.Services;
 
 public class ClientService : BackgroundService
 {
-    NativeChatClient NativeChatClient { get; set; }
+    NativeChatCompletionsClient NativeChatCompletionsClient { get; set; }
     SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
     IHostApplicationLifetime ApplicationLifetime { get; set; }
     ContextManagerService LocalMcpService { get; set; }
@@ -25,16 +25,16 @@ public class ClientService : BackgroundService
         LocalMcpService = localMcpService;
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
 
-        NativeChatClient = new NativeChatClient(SilmoonConfigureService.DefaultProvider, SilmoonConfigureService.DefaultModelName, UtilPrompt.ContextPrompt);
-        NativeChatClient.OnToolCallsStart += NativeChatClient_OnToolCallsStart;
-        NativeChatClient.OnToolCallsFinish += NativeChatClient_OnToolCallsFinish;
+        NativeChatCompletionsClient = new NativeChatCompletionsClient(SilmoonConfigureService.DefaultProvider, SilmoonConfigureService.DefaultModelName, UtilPrompt.ContextPrompt);
+        NativeChatCompletionsClient.OnToolCallsStart += NativeChatClient_OnToolCallsStart;
+        NativeChatCompletionsClient.OnToolCallsFinish += NativeChatClient_OnToolCallsFinish;
 
-        NativeChatClient.OnToolExecuting += NativeChatClient_OnToolExecuting;
-        NativeChatClient.OnToolExecuted += NativeChatClient_OnToolExecuted;
-        NativeChatClient.OnStreamOutputCompleted += NativeChatClient_OnStreamOutputCompleted;
-        LocalMcpService.InjectMcp(NativeChatClient);
-        NativeChatClient.Tools.Add(Tool.Create("Test_ToolCallTest", "This is a test tool_calling test tool.", []));
-        //NativeChatClient.EnableThinking = true;
+        NativeChatCompletionsClient.OnToolExecuting += NativeChatClient_OnToolExecuting;
+        NativeChatCompletionsClient.OnToolExecuted += NativeChatClient_OnToolExecuted;
+        NativeChatCompletionsClient.OnStreamOutputCompleted += NativeChatClient_OnStreamOutputCompleted;
+        LocalMcpService.InjectMcp(NativeChatCompletionsClient);
+        NativeChatCompletionsClient.Tools.Add(Tool.Create("Test_ToolCallTest", "This is a test tool_calling test tool.", []));
+        //NativeChatCompletionsClient.EnableThinking = true;
     }
 
 
@@ -75,11 +75,19 @@ public class ClientService : BackgroundService
     bool stream = true;
     protected async override Task ExecuteAsync(CancellationToken stoppingToken)
     {
-        await Task.Delay(500);
-        while (true)
+        await Task.Delay(500, stoppingToken);
+        while (!stoppingToken.IsCancellationRequested)
         {
             Console.Write(Role.User + ": ");
-            string input = Console.ReadLine();
+            string input;
+            try
+            {
+                input = await Console.In.ReadLineAsync(stoppingToken);
+            }
+            catch (OperationCanceledException)
+            {
+                break;
+            }
             if (input.IsNullOrEmpty())
             {
                 if (input is null)
@@ -95,7 +103,7 @@ public class ClientService : BackgroundService
                 switch (command)
                 {
                     case "clear":
-                        NativeChatClient.ClearHistory();
+                        NativeChatCompletionsClient.ClearHistory();
                         Console.WriteLine("Message history cleared.");
                         break;
                     case "exit":
@@ -113,8 +121,8 @@ public class ClientService : BackgroundService
 
                 if (stream)
                 {
-                    List<Chunk> chunks = [];
-                    await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(input, chunks))
+                    List<ChatCompletionsChunk> chunks = [];
+                    await foreach (var chunk in NativeChatCompletionsClient.CompletionsStreamAsync(input, chunks))
                     {
                         if (chunk.State)
                         {
@@ -135,7 +143,7 @@ public class ClientService : BackgroundService
                 }
                 else
                 {
-                    Response response = await NativeChatClient.CompletionsAsync(input);
+                    ChatCompletionsResponse response = await NativeChatCompletionsClient.CompletionsAsync(input);
                     response.Choices.Each(x => Console.WriteWithColor(x?.Message?.Content, ConsoleColor.White));
                     Console.WriteLine($"【完成{response.Choices[0].FinishReason}】");
                     if (response.Choices[0].FinishReason == "tool_calls") Console.WriteWithColor(response.Choices[0].Message.ToolCalls?.ToFormattedJsonString(), ConsoleColor.DarkYellow);
@@ -145,3 +153,5 @@ public class ClientService : BackgroundService
         }
     }
 }
+
+

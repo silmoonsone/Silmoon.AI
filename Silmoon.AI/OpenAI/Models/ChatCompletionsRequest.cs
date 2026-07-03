@@ -1,11 +1,11 @@
-using System;
+﻿using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Silmoon.Extensions;
 
-namespace Silmoon.AI.Models.OpenAI.Models;
+namespace Silmoon.AI.OpenAI.Models;
 
-public class Request
+public class ChatCompletionsRequest
 {
     [JsonProperty("model")]
     public string Model { get; set; }
@@ -24,7 +24,7 @@ public class Request
     [JsonIgnore]
     public JObject ExtraBody { get; set; } = new JObject();
     public bool ShouldSerializeTools() => Tools != null && Tools.Count > 0;
-    public Request(string model, IMessage[] messages, bool stream = true)
+    public ChatCompletionsRequest(string model, IMessage[] messages, bool stream = true)
     {
         Model = model;
         Messages = messages;
@@ -81,3 +81,12 @@ public class Request
         return jsonObject.ToJsonString(settings);
     }
 }
+
+[Obsolete("Use ChatCompletionsRequest. This alias is kept for source compatibility.")]
+public class Request : ChatCompletionsRequest
+{
+    public Request(string model, IMessage[] messages, bool stream = true) : base(model, messages, stream)
+    {
+    }
+}
+

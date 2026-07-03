@@ -1,8 +1,8 @@
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using Newtonsoft.Json;
 using Silmoon.Extensions;
 
-namespace Silmoon.AI.Models.OpenAI.Models;
+namespace Silmoon.AI.OpenAI.Models;
 
 public class Tool
 {

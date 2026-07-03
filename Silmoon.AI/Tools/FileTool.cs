@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System.Collections.Generic;
@@ -240,3 +240,4 @@ namespace Silmoon.AI.Tools
         //}
     }
 }
+

@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.Models;
 using System;
 using System.Collections.Concurrent;
@@ -20,7 +20,8 @@ namespace Silmoon.AI
     public delegate Task ToolExecutedHandler(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
 
 
-    public delegate Task StreamOutputHandler(StateSet<bool, Chunk> chunkState);
+    public delegate Task StreamOutputHandler(StateSet<bool, ChatCompletionsChunk> chunkState);
 
     public delegate Task StreamOutputCompletedHandler(Result result);
 }
+

@@ -1,6 +1,6 @@
 ﻿using Newtonsoft.Json;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.Extensions;
 using System;
 using System.Globalization;
@@ -111,3 +111,4 @@ namespace Silmoon.AI.Tools
         }
     }
 }
+

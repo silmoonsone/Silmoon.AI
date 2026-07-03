@@ -1,7 +1,7 @@
 ﻿using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Interfaces;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.Interfaces;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.Models;
 using System;
 using System.Collections.Concurrent;
@@ -20,3 +20,4 @@ namespace Silmoon.AI.Interfaces
         Task NotifyToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
     }
 }
+

@@ -1,8 +1,8 @@
 ﻿using Microsoft.Extensions.Options;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Enums;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.AI.OpenAI;
 using Silmoon.AI.Tools;
 using Silmoon.Extensions;
@@ -21,7 +21,7 @@ namespace Silmoon.AI.WinFormTest
 {
     public partial class OpenAIClientTestForm : Form
     {
-        NativeChatClient NativeChatClient { get; set; }
+        NativeChatCompletionsClient NativeChatCompletionsClient { get; set; }
         SilmoonConfigureService ConfigureService { get; set; }
 
         public OpenAIClientTestForm()
@@ -37,19 +37,19 @@ namespace Silmoon.AI.WinFormTest
 
             var systemPrompt = textBox1.Text;
             systemPrompt = MakeSystemPrompt();
-            NativeChatClient = new NativeChatClient(ConfigureService.ConfigJson.Value<string>("apiUrl"), ConfigureService.ConfigJson.Value<string>("apiKey"), ConfigureService.ConfigJson.Value<string>("modelName"), systemPrompt);
-            NativeChatClient.OnToolCallsStart += NativeChatClient_OnToolCallsStart;
-            NativeChatClient.OnToolExecuting += NativeChatClient_OnToolExecuting;
-            NativeChatClient.OnToolExecuted += NativeChatClient_OnToolExecuted;
-            NativeChatClient.OnToolCallsFinish += NativeChatClient_OnToolCallsFinish;
-            NativeChatClient.OnStreamOutputCompleted += NativeChatClient_OnStreamOutputCompleted;
-            NativeChatClient.Tools.AddRange(makeTools());
-            new FileTool().InjectToolCall(NativeChatClient);
-            new CommandTool().InjectToolCall(NativeChatClient);
-            new WaitTool().InjectToolCall(NativeChatClient);
-            new WorldStateTool().InjectToolCall(NativeChatClient);
+            NativeChatCompletionsClient = new NativeChatCompletionsClient(ConfigureService.ConfigJson.Value<string>("apiUrl"), ConfigureService.ConfigJson.Value<string>("apiKey"), ConfigureService.ConfigJson.Value<string>("providerName"), ConfigureService.ConfigJson.Value<string>("modelName"), systemPrompt);
+            NativeChatCompletionsClient.OnToolCallsStart += NativeChatClient_OnToolCallsStart;
+            NativeChatCompletionsClient.OnToolExecuting += NativeChatClient_OnToolExecuting;
+            NativeChatCompletionsClient.OnToolExecuted += NativeChatClient_OnToolExecuted;
+            NativeChatCompletionsClient.OnToolCallsFinish += NativeChatClient_OnToolCallsFinish;
+            NativeChatCompletionsClient.OnStreamOutputCompleted += NativeChatClient_OnStreamOutputCompleted;
+            NativeChatCompletionsClient.Tools.AddRange(makeTools());
+            new FileTool().InjectToolCall(NativeChatCompletionsClient);
+            new CommandTool().InjectToolCall(NativeChatCompletionsClient);
+            new WaitTool().InjectToolCall(NativeChatCompletionsClient);
+            new WorldStateTool().InjectToolCall(NativeChatCompletionsClient);
             // Inject 须在宿主 OnToolCallStart 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool 对未知函数名的结果
-            new MemoryTool(NativeChatClient).InjectToolCall(NativeChatClient);
+            new MemoryTool(NativeChatCompletionsClient).InjectToolCall(NativeChatCompletionsClient);
         }
 
         private async Task NativeChatClient_OnToolCallsStart(ToolCallParameter[] toolCallParameters)
@@ -119,8 +119,8 @@ namespace Silmoon.AI.WinFormTest
             textBox3.Text = string.Empty;
 
 
-            List<Chunk> chunks = [];
-            await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(userPrompt, chunks))
+            List<ChatCompletionsChunk> chunks = [];
+            await foreach (var chunk in NativeChatCompletionsClient.CompletionsStreamAsync(userPrompt, chunks))
             {
                 if (chunk.State)
                 {
@@ -142,3 +142,5 @@ namespace Silmoon.AI.WinFormTest
         }
     }
 }
+
+

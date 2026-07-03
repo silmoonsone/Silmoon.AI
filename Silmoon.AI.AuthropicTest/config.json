@@ -1,0 +1,8 @@
+﻿{
+  "apiUrl": "https://api.deepseek.com/anthropic",
+  "apiKey": "sk-***",
+  "providerName": "deepseek",
+  "modelName": "deepseek-v4-flash",
+  "apiKind": "AnthropicMessages",
+  "anthropicVersion": "2023-06-01"
+}

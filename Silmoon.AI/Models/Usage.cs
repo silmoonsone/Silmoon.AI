@@ -38,3 +38,4 @@ namespace Silmoon.AI.Models
         public int? TextTokens { get; set; }
     }
 }
+

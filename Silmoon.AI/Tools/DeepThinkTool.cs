@@ -1,8 +1,8 @@
 ﻿using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Enums;
-using Silmoon.AI.Models.OpenAI.Interfaces;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
+using Silmoon.AI.Interfaces;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
@@ -55,9 +55,9 @@ namespace Silmoon.AI.Tools
 
                 if (system is not null) NativeChatClient.SystemPrompt = system;
 
-                List<Chunk> chunks = [];
+                List<ChatCompletionsChunk> chunks = [];
                 Console.WriteLineWithColor("Agent response start:", ConsoleColor.Green, ConsoleColor.Blue);
-                await foreach (var chunk in NativeChatClient.CompletionsStreamAsync([MessageContent.Create(Role.User, content)], chunks))
+                await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(new List<IMessage> { MessageContent.Create(Role.User, content) }, chunks))
                 {
                     if (chunk.State)
                     {
@@ -84,3 +84,4 @@ namespace Silmoon.AI.Tools
         }
     }
 }
+

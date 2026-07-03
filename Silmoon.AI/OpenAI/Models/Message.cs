@@ -1,9 +1,9 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
-using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.OpenAI.Models.Enums;
 using Silmoon.Extensions;
 
-namespace Silmoon.AI.Models.OpenAI.Models;
+namespace Silmoon.AI.OpenAI.Models;
 
 public interface IMessage
 {
@@ -132,3 +132,4 @@ public class MessageText : Message
     public string Text { get; set; }
     public override string GetContent() => Text;
 }
+

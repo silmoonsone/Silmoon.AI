@@ -22,18 +22,21 @@ namespace Silmoon.AI.Terminal.Services
         {
             SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
         }
-        public void InjectMcp(NativeChatClient nativeChatClient)
+        public void InjectMcp(NativeChatCompletionsClient chatCompletionsClient)
         {
-            ExecuteTools.Add(new DeepThinkTool(nativeChatClient));
-            ExecuteTools.Add(new MemoryTool(nativeChatClient));
+            ExecuteTools.Add(new DeepThinkTool(chatCompletionsClient));
+            ExecuteTools.Add(new MemoryTool(chatCompletionsClient));
 
             string systemPrompt = SilmoonConfigureService.SystemPrompt;
-            if (systemPrompt is not null) nativeChatClient.SystemPrompt += "\r\n" + systemPrompt;
+            if (systemPrompt is not null) chatCompletionsClient.SystemPrompt += "\r\n" + systemPrompt;
 
             foreach (var tool in ExecuteTools)
             {
-                tool.InjectToolCall(nativeChatClient);
+                tool.InjectToolCall(chatCompletionsClient);
             }
         }
     }
 }
+
+
+

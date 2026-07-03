@@ -1,9 +1,8 @@
 ﻿using Newtonsoft.Json.Linq;
 using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Enums;
-using Silmoon.AI.Models.OpenAI.Interfaces;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
@@ -943,3 +942,4 @@ namespace Silmoon.AI.Tools
         }
     }
 }
+

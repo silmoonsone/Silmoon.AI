@@ -1,15 +1,15 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 
-namespace Silmoon.AI.Models.OpenAI.Models;
+namespace Silmoon.AI.OpenAI.Models;
 
 public class ToolCall
 {
-    // 流式增量里会有 index，用于标识第几个 tool call。
+    // 流式增量里会带 index，用于标识第几个 tool call。
     // 非流式完整结果里通常可以忽略，但保留更通用。
     [JsonProperty("index")]
     public int? Index { get; set; }
 
-    // 流式增量里首段通常有 id，后续段可能为空或缺失。
+    // 流式增量里首段通常带 id，后续段可能为空或缺失。
     [JsonProperty("id")]
     public string? Id { get; set; }
 
@@ -32,3 +32,4 @@ public class ToolCallFunction
     [JsonProperty("arguments")]
     public string? Arguments { get; set; }
 }
+

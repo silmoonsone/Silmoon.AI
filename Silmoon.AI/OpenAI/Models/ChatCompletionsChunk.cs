@@ -1,12 +1,13 @@
+﻿using Silmoon.AI.Models;
 using System;
 using Newtonsoft.Json;
 
-namespace Silmoon.AI.Models.OpenAI.Models;
+namespace Silmoon.AI.OpenAI.Models;
 
-public class Chunk
+public class ChatCompletionsChunk
 {
     [JsonProperty("choices")]
-    public ChunkChoice[] Choices { get; set; }
+    public ChatCompletionsChunkChoice[] Choices { get; set; }
     [JsonProperty("model")]
     public string Model { get; set; }
     [JsonProperty("id")]
@@ -18,3 +19,10 @@ public class Chunk
     [JsonProperty("usage")]
     public Usage Usage { get; set; }
 }
+
+[Obsolete("Use ChatCompletionsChunk. This alias is kept for source compatibility.")]
+public class Chunk : ChatCompletionsChunk
+{
+}
+
+

@@ -1,8 +1,8 @@
-using Newtonsoft.Json;
+﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Enums;
-using Silmoon.AI.Models.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
+using Silmoon.AI.OpenAI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
@@ -30,11 +30,11 @@ public class WaitTool : ExecuteTool
             Wait for the specified milliseconds, then return.
             This tool has no side effects; it only delays response completion for this call.
             Important: multiple tool calls in the same assistant interaction are executed in parallel by default; three `3000 ms` waits run together and finish in about `3` seconds wall-clock (not `9` seconds).
-            Limits: duration is clamped to **100 ms–300 s**.
+            Limits: duration is clamped to **100 ms-300 s**.
             Return JSON object with `State`, `Message`, `Data` (`Data.waitedMilliseconds`, optional `Data.reason`).
             """,
             [
-                new ToolParameterProperty("integer", "durationMilliseconds", $"Ms to wait (clamped {MinDurationMs}–{MaxDurationMs}). **Same turn:** tell the user this value + seconds before/around the call.", null, true),
+                new ToolParameterProperty("integer", "durationMilliseconds", $"Ms to wait (clamped {MinDurationMs}-{MaxDurationMs}). **Same turn:** tell the user this value + seconds before/around the call.", null, true),
                 new ToolParameterProperty("string", "reason", "Optional; can mirror why you wait (still state duration in user text).", null, false),
             ]),
         ];
@@ -82,3 +82,5 @@ public class WaitTool : ExecuteTool
         return result;
     }
 }
+
+

@@ -1,10 +1,10 @@
-using System;
+﻿using System;
 using Newtonsoft.Json;
-using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.OpenAI.Models.Enums;
 
-namespace Silmoon.AI.Models.OpenAI.Models;
+namespace Silmoon.AI.OpenAI.Models;
 
-public class Delta
+public class ChatCompletionsDelta
 {
     [JsonProperty("role")]
     public Role? Role { get; set; }
@@ -18,3 +18,9 @@ public class Delta
     public List<ToolCall> ToolCalls { get; set; }
     public string GetThinking() => ReasoningContent ?? Reasoning ?? null;
 }
+
+[Obsolete("Use ChatCompletionsDelta. This alias is kept for source compatibility.")]
+public class Delta : ChatCompletionsDelta
+{
+}
+

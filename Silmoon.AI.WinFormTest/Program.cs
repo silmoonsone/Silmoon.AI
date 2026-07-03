@@ -1,4 +1,4 @@
-namespace Silmoon.AI.WinFormTest
+﻿namespace Silmoon.AI.WinFormTest
 {
     internal static class Program
     {

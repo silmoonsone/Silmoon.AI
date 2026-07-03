@@ -1,102 +1,226 @@
-# Silmoon.AI
+﻿# Silmoon.AI
 
-基于 .NET 的轻量库：对接 **OpenAI-Compatible** 聊天接口，支持 **工具调用（Function Calling）**，附带可复用的本地工具与三个示例程序，用于搭建聊天助手或简单 Agent。
+Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊天、流式输出、工具调用和简单 Agent 场景。
 
-**说明：本 README 由 AI 生成，请以仓库源码为准。**
+当前版本把不同厂商和不同原生接口抽象到统一的 `INativeChatClient` 上，同时保留各接口的原生客户端，便于单独调试协议行为。
 
-## 这是什么
+## 主要能力
 
 | 能力 | 说明 |
 |------|------|
-| 聊天 | 普通请求与 **SSE 流式**；流式回合的 **`Result`** 可附带 **`Usage`**（token 用量，视厂商返回字段而定）；**`EnableThinking`** 等由 `Request` 按厂商合并进请求体（见 `SetEnableThinking` / `ExtraBody`）。 |
-| 推理链 | 支持将模型的 **思考/推理内容**（如 `reasoning_content`）随助手消息写入历史，流式输出时可与正文分开展示（示例见 Terminal 的 `ClientService`）。 |
-| 消息 | 会话历史为 **`IMessage`**，除普通文本（`MessageContent`）外，还可使用 JSON、多段内容、图文片段等形态（见 `Models/OpenAI/Models/Message.cs`）。 |
-| 工具 | 向模型注册函数 schema；模型发起 `tool_calls` 后由 **`ExecuteToolManager`** 调度，你在 **`OnToolCallInvoke`** 等事件中实现逻辑，库负责写回结果并继续对话。 |
-| 内置工具 | 文件读写与按行读取、终端命令（一次性 / 持久 Shell）、等待、会话记忆压缩与续接、本机环境快照、委托子任务等，位于 **`Silmoon.AI/Tools`**。 |
-| 会话 | **`ResetHistory`** 清空或续接记忆；**`RollbackHistory`** 按轮次回滚。 |
-| 示例 | **Terminal**（多厂商 JSON + `ContextManagerService` 注入工具）、**HostingTest**、**WinFormTest**（Windows）。 |
+| 统一客户端 | 通过 `NativeChatClientFactory.Create(...)` 根据 `ModelProvider.ApiKind` 创建统一的 `INativeChatClient`。 |
+| OpenAI Chat Completions | `NativeChatCompletionsClient` 支持 OpenAI-Compatible `/chat/completions`，包含普通请求、SSE 流式、工具调用和部分厂商的 thinking 字段适配。 |
+| Anthropic Messages | `NativeAnthropicClient` 支持 Anthropic Messages 风格接口，并把返回结果适配为库内通用的 Chat Completions 结果模型。 |
+| OpenAI Responses | `NativeResponsesClient` 已预留为 Responses API 实现入口，便于后续扩展，不影响现有统一接口。 |
+| SSE 传输 | `SseHttpClient` 已从 Chat Completions 实现中抽出，可作为独立的 SSE HTTP 请求封装复用。 |
+| 工具调用 | 使用 `Tool` 声明函数 schema，通过 `ExecuteToolManager` 执行模型返回的 `tool_calls`，并自动把工具结果写回历史继续对话。 |
+| 内置工具 | `FileTool`、`CommandTool`、`WaitTool`、`WorldStateTool`、`MemoryTool` 等位于 `Silmoon.AI/Tools`。 |
+| 会话历史 | `ClearHistory(...)`、`RollbackHistory(...)` 用于清理或回滚消息历史，System Prompt 会按客户端规则保留。 |
+| 兼容旧历史 | `NativeApiJson` 内置反序列化兼容绑定，可读取旧命名空间里的历史 `$type`。以后旧历史淘汰后这部分可以移除。 |
 
-核心入口：**`Silmoon.AI.OpenAI.NativeChatClient`**。协议与消息类型在 **`Silmoon.AI/Models/OpenAI`**。
+## NativeApiKind
 
-## 仓库里有什么
+`ModelProvider.ApiKind` 用于选择底层原生接口。
 
-```text
-Silmoon.AI/              ← 核心类库（客户端、模型、ExecuteToolManager、Tools）
-Silmoon.AI.Terminal/     ← 终端示例
-Silmoon.AI.HostingTest/  ← Hosting 控制台示例
-Silmoon.AI.WinFormTest/  ← WinForms 示例
-```
+| 值 | 客户端 | 状态 |
+|----|--------|------|
+| `OpenAIChatCompletions` | `NativeChatCompletionsClient` | 当前主力实现，适配 OpenAI-Compatible 厂商。 |
+| `AnthropicMessages` | `NativeAnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
+| `OpenAIResponses` | `NativeResponsesClient` | 预留实现入口，后续完善 Responses API。 |
 
-- **.NET SDK 10.0**（`net10.0` / `net10.0-windows`）  
-- **MIT**（`LICENSE.txt`）
-
-## 跑起来
-
-```bash
-git clone https://github.com/silmoonsone/Silmoon.AI.git
-cd Silmoon.AI
-dotnet restore
-```
-
-在 **`config.json` / `config.debug.json`** 中配置 **API 地址、密钥、模型**；本地覆盖可用 **`config.local*.json`**（勿提交密钥）。
-
-```bash
-dotnet run --project ./Silmoon.AI.Terminal/Silmoon.AI.Terminal.csproj
-dotnet run --project ./Silmoon.AI.HostingTest/Silmoon.AI.HostingTest.csproj
-dotnet run --project ./Silmoon.AI.WinFormTest/Silmoon.AI.WinFormTest.csproj
-```
-
-- **Terminal**：`defaultModel`、`modelProviders`（可选 `systemPrompt`、`providerDescription` 等）。  
-- **HostingTest / WinFormTest**：`apiUrl`、`apiKey`、`modelName`。
-
-Terminal / Hosting 控制台：`@clear` 清历史，`@exit` 退出。
-
-## 在你自己的程序里调用（含工具）
-
-```bash
-dotnet new console -n MySilmoonAiDemo -f net10.0
-cd MySilmoonAiDemo
-dotnet add reference <你的路径>/Silmoon.AI/Silmoon.AI.csproj
-```
+统一创建方式：
 
 ```csharp
+using Silmoon.AI;
+using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models;
-using Silmoon.AI.Models.OpenAI.Models;
-using Silmoon.AI.OpenAI;
+
+var provider = new ModelProvider
+{
+    ProviderName = "deepseek",
+    ApiUrl = "https://api.example.com",
+    ApiKey = "sk-***",
+    ApiKind = NativeApiKind.AnthropicMessages,
+    AnthropicVersion = "2023-06-01",
+    Models = [new Model { Name = "deepseek-chat" }]
+};
+
+using INativeChatClient client = NativeChatClientFactory.Create(
+    provider,
+    modelName: "deepseek-chat",
+    systemPrompt: "你是一个简洁的中文助手。");
+```
+
+## 项目结构
+
+```text
+Silmoon.AI/                         核心类库
+  Anthropic/                        Anthropic Messages 原生客户端和模型
+  OpenAI/                           OpenAI Chat Completions 原生客户端和模型
+  Responses/                        OpenAI Responses 预留客户端
+  Interfaces/                       INativeChatClient 等公共接口
+  Models/                           跨接口共享模型
+  Tools/                            内置工具
+  SseHttpClient.cs                  独立 SSE HTTP 客户端封装
+
+Silmoon.AI.HostingTest/             统一 INativeChatClient 调用示例
+Silmoon.AI.ChatCompletionsTest/     OpenAI Chat Completions 原生客户端测试
+Silmoon.AI.AuthropicTest/           Anthropic Messages 原生客户端测试
+Silmoon.AI.Terminal/                终端示例
+Silmoon.AI.WinFormTest/             WinForms 示例
+```
+
+## 配置
+
+示例项目使用 `config.json`、`config.debug.json` 作为默认配置，并支持 `config.local.json`、`config.local.debug.json` 作为本机覆盖。带 `local` 的配置用于密钥和私有地址，不应提交到 Git。
+
+统一配置示例：
+
+```json
+{
+  "apiUrl": "https://api.example.com",
+  "apiKey": "sk-***",
+  "providerName": "deepseek",
+  "modelName": "deepseek-chat",
+  "apiKind": "AnthropicMessages",
+  "anthropicVersion": "2023-06-01"
+}
+```
+
+OpenAI-Compatible Chat Completions 示例：
+
+```json
+{
+  "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
+  "apiKey": "sk-***",
+  "providerName": "aliyun",
+  "modelName": "qwen3.6-plus",
+  "apiKind": "OpenAIChatCompletions"
+}
+```
+
+`providerName` 不只是展示名，部分兼容厂商的请求体差异会用它识别。
+
+## 运行示例
+
+```bash
+dotnet restore
+dotnet run --project ./Silmoon.AI.HostingTest/Silmoon.AI.HostingTest.csproj
+dotnet run --project ./Silmoon.AI.ChatCompletionsTest/Silmoon.AI.ChatCompletionsTest.csproj
+dotnet run --project ./Silmoon.AI.AuthropicTest/Silmoon.AI.AuthropicTest.csproj
+```
+
+控制台示例常用命令：
+
+| 命令 | 作用 |
+|------|------|
+| `@clear` | 清空当前会话历史。 |
+| `@exit` | 退出程序。 |
+| `@stream` | Anthropic 测试项目切换到流式模式。 |
+| `@nostream` | Anthropic 测试项目切换到非流式模式。 |
+
+## 最小调用示例
+
+```csharp
+using Silmoon.AI;
+using Silmoon.AI.Interfaces;
+using Silmoon.AI.Models;
+using Silmoon.AI.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
+using Silmoon.Models;
+
+var provider = new ModelProvider
+{
+    ProviderName = "aliyun",
+    ApiUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
+    ApiKey = "sk-***",
+    ApiKind = NativeApiKind.OpenAIChatCompletions,
+    Models = [new Model { Name = "qwen3.6-plus" }]
+};
+
+using INativeChatClient client = NativeChatClientFactory.Create(
+    provider,
+    modelName: "qwen3.6-plus",
+    systemPrompt: "用简短中文回答。");
+
+var response = await client.CompletionsAsync("你好，简单介绍一下 Silmoon.AI。");
+Console.WriteLine(response.Choices.FirstOrDefault()?.Message?.Content);
+```
+
+流式调用：
+
+```csharp
+List<ChatCompletionsChunk> chunks = [];
+await foreach (var state in client.CompletionsStreamAsync("写一句短诗。", chunks))
+{
+    if (!state.State)
+    {
+        Console.WriteLine(state.Message);
+        continue;
+    }
+
+    foreach (var choice in state.Data.Choices)
+        Console.Write(choice.Delta?.Content);
+}
+```
+
+## 工具调用示例
+
+```csharp
+using Newtonsoft.Json.Linq;
+using Silmoon.AI.Models;
 using Silmoon.Extensions;
 using Silmoon.Models;
 
-using var client = new NativeChatClient(
-    "https://api.example.com/v1",
-    "your-api-key",
-    "your-provider",   // 与配置中 providerName 一致，如 aliyun、deepseek
-    "your-model",
-    systemPrompt: "用简短中文回答。");
-
 client.Tools.Add(Tool.Create(
-    "get_weather",
-    "根据城市名返回一句天气（演示）。",
-    [new ToolParameterProperty("string", "city", "城市名", null, true)]));
+    "Test_GetSecretCode",
+    "Return a fixed test code.",
+    []));
 
-client.OnToolCallInvoke += (p, _) =>
+client.OnToolCallInvoke += (parameter, currentResult) =>
 {
-    if (p.FunctionName != "get_weather")
-        return Task.FromResult<ToolCallResult>(null);
+    if (parameter.FunctionName != "Test_GetSecretCode")
+        return Task.FromResult(currentResult);
 
-    var city = p.Parameters["city"]?.Value<string>() ?? "";
-    return Task.FromResult(ToolCallResult.Create(p, true.ToStateSet<object>($"{city}：晴，25°C（演示）")));
+    return Task.FromResult(
+        ToolCallResult.Create(parameter, true.ToStateSet<object>("TOOL_OK")));
 };
-
-var reply = await client.CompletionsAsync("北京天气怎么样？");
-Console.WriteLine(reply.Choices[0].Message.Content);
 ```
 
-- 流式：**`CompletionsStreamAsync`**，可订阅 **`OnStreamOutput`** / **`OnStreamOutputCompleted`**。  
-- 内置工具链：继承 **`ExecuteTool`** 并 **`InjectToolCall(client)`**，或使用 **`ExecuteToolManager.AddExecuteTool`**。  
-- 工具生命周期还可订阅 **`OnToolCallsStart`**、**`OnToolExecuting`**、**`OnToolExecuted`**、**`OnToolCallsFinish`** 等（示例见 Terminal / HostingTest）。
+内置工具可直接注入：
 
-更完整的用法与边界行为以 **`NativeChatClient`**、**`ExecuteToolManager`** 及各 **`Tools/*Tool.cs`** 为准。
+```csharp
+new WaitTool().InjectToolCall(client);
+new WorldStateTool().InjectToolCall(client);
+new MemoryTool(client).InjectToolCall(client);
+```
 
-## 依赖
+`FileTool` 和 `CommandTool` 能访问文件系统或执行命令，实际产品中应按宿主环境做好权限边界。
 
-核心：**`Silmoon`、`Silmoon.Extensions`**（版本见 **`Silmoon.AI.csproj`**）。示例项目另引用 Hosting、JSON 等包，见各 **`.csproj`**。
+## 模型与命名空间
+
+当前模型按接口实现分组：
+
+```text
+Silmoon.AI/OpenAI/Models
+Silmoon.AI/Anthropic/Models
+Silmoon.AI/Models
+```
+
+`Silmoon.AI.Models` 放跨接口共享类型，例如 `ModelProvider`、`NativeApiKind`、`ToolCallParameter`、`ToolCallResult`、`Usage`。OpenAI Chat Completions 专属类型放在 `Silmoon.AI.OpenAI.Models` 下。
+
+旧的 `Silmoon.AI.Models.OpenAI.Models.*` 类型名已迁移，`NativeApiJson` 目前保留历史兼容。
+
+## 构建
+
+```bash
+dotnet build ./Silmoon.AI.sln
+```
+
+当前目标框架为 .NET 10，Windows 示例项目需要 Windows 桌面相关 SDK。
+
+## 依赖与许可
+
+核心依赖见 `Silmoon.AI/Silmoon.AI.csproj`，示例项目的 Hosting、WinForms 等依赖见各自 `.csproj`。
+
+本项目使用 MIT License，见 `LICENSE.txt`。

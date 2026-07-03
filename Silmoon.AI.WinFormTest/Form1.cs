@@ -1,4 +1,4 @@
-namespace Silmoon.AI.WinFormTest
+﻿namespace Silmoon.AI.WinFormTest
 {
     public partial class Form1 : Form
     {
@@ -16,3 +16,4 @@ namespace Silmoon.AI.WinFormTest
         }
     }
 }
+

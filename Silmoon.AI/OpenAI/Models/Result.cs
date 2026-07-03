@@ -1,9 +1,10 @@
+﻿using Silmoon.AI.Models;
 using System;
-using Silmoon.AI.Models.OpenAI.Enums;
+using Silmoon.AI.OpenAI.Models.Enums;
 using Silmoon.Extensions;
 using Newtonsoft.Json;
 
-namespace Silmoon.AI.Models.OpenAI.Models;
+namespace Silmoon.AI.OpenAI.Models;
 
 public class Result
 {
@@ -15,13 +16,13 @@ public class Result
     public List<ToolCall> ToolCalls { get; set; } = [];
     public Usage? Usage { get; set; }
 
-    public static Result Create(ChunkChoice[] chunkChoices, Usage usage = null, bool includeReasonContent = false)
+    public static Result Create(ChatCompletionsChunkChoice[] chunkChoices, Usage usage = null, bool includeReasonContent = false)
     {
         var result = new Result() { Usage = usage };
         Dictionary<int, ToolCall> toolCallsByIndex = [];
         if (chunkChoices is not null && chunkChoices.Length > 0)
         {
-            foreach (ChunkChoice choice in chunkChoices)
+            foreach (ChatCompletionsChunkChoice choice in chunkChoices)
             {
                 if (choice.Delta is not null)
                 {
@@ -42,9 +43,9 @@ public class Result
         AssignOrderedToolCalls(result, toolCallsByIndex);
         return result;
     }
-    public static Result Create(Chunk[] responses, bool includeReasonContent = false)
+    public static Result Create(ChatCompletionsChunk[] responses, bool includeReasonContent = false)
     {
-        List<ChunkChoice> chunkChoices = [];
+        List<ChatCompletionsChunkChoice> chunkChoices = [];
         Usage usage = null;
         foreach (var response in responses)
         {
@@ -58,9 +59,9 @@ public class Result
 
     /// <summary>
     /// 将流式片段按 OpenAI 的 <c>index</c> 合并：同一 index 下拼接 <c>arguments</c>，并合并首段出现的 id/type/name。
-    /// 兼容 <c>delta.tool_calls</c>（标准）以及少数实现在 <c>choices[].tool_calls</c> 上的增量。
+    /// 兼容 <c>delta.tool_calls</c>（标准）以及少数实现放在 <c>choices[].tool_calls</c> 上的增量。
     /// </summary>
-    static void AccumulateToolCallFragments(Dictionary<int, ToolCall> byIndex, ChunkChoice choice)
+    static void AccumulateToolCallFragments(Dictionary<int, ToolCall> byIndex, ChatCompletionsChunkChoice choice)
     {
         var partials = choice.Delta?.ToolCalls;
         if (partials.IsNullOrEmpty()) partials = choice.ToolCalls;
@@ -82,9 +83,19 @@ public class Result
             if (partial.Function.Arguments is not null) merged.Function.Arguments += partial.Function.Arguments;
         }
     }
+
+    [Obsolete("Use ChatCompletionsChunkChoice[]. This overload is kept for source compatibility.")]
+    public static Result Create(ChunkChoice[] chunkChoices, Usage usage = null, bool includeReasonContent = false) =>
+        Create(chunkChoices.Cast<ChatCompletionsChunkChoice>().ToArray(), usage, includeReasonContent);
+
+    [Obsolete("Use ChatCompletionsChunk[]. This overload is kept for source compatibility.")]
+    public static Result Create(Chunk[] responses, bool includeReasonContent = false) =>
+        Create(responses.Cast<ChatCompletionsChunk>().ToArray(), includeReasonContent);
     static void AssignOrderedToolCalls(Result result, Dictionary<int, ToolCall> byIndex)
     {
         if (!byIndex.IsNullOrEmpty())
             result.ToolCalls = [.. byIndex.OrderBy(kv => kv.Key).Select(kv => kv.Value)];
     }
 }
+
+
