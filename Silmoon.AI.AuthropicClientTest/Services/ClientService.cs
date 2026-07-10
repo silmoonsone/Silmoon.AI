@@ -9,7 +9,7 @@ using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using Silmoon.Models;
 
-namespace Silmoon.AI.AuthropicTest.Services;
+namespace Silmoon.AI.AuthropicClientTest.Services;
 
 public class ClientService : BackgroundService
 {

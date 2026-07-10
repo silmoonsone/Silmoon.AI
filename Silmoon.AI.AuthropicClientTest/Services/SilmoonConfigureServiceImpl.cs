@@ -6,7 +6,7 @@ using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using Silmoon.Extensions.Hosting.Services;
 
-namespace Silmoon.AI.AuthropicTest.Services;
+namespace Silmoon.AI.AuthropicClientTest.Services;
 
 public class SilmoonConfigureServiceImpl : SilmoonConfigureService
 {

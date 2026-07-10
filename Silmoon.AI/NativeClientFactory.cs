@@ -11,7 +11,7 @@ public static class NativeClientFactory
         provider.ApiKind switch
         {
             NativeApiKind.Authropic => new AnthropicClient(provider, modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds),
-            NativeApiKind.Responses => new ResponsesClient(provider, modelName, systemPrompt),
+            NativeApiKind.Responses => new ResponsesClient(provider, modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds),
             _ => new ChatClient(provider, modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds),
         };
 }

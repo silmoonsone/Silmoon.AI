@@ -9,7 +9,7 @@ using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
 
-namespace Silmoon.AI.ChatCompletionsTest.Services
+namespace Silmoon.AI.ChatClientTest.Services
 {
     public class SilmoonConfigureServiceImpl : SilmoonConfigureService
     {

@@ -10,6 +10,7 @@
   "modelProviders": [
     {
       "providerName": "aliyun",
+      "apiKind": "Chat",
       "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
       "apiKey": "sk-***",
       "models": [

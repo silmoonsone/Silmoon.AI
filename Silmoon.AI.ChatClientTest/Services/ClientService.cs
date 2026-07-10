@@ -12,7 +12,7 @@ using Silmoon.Models;
 using System;
 using System.Collections.Concurrent;
 
-namespace Silmoon.AI.ChatCompletionsTest.Services;
+namespace Silmoon.AI.ChatClientTest.Services;
 
 public class ClientService : BackgroundService
 {

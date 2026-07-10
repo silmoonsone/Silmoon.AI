@@ -11,7 +11,7 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 | 统一客户端 | 通过 `NativeClientFactory.Create(...)` 根据 `ModelProvider.ApiKind` 创建统一的 `INativeClient`。 |
 | OpenAI Chat Completions | `ChatClient` 支持 OpenAI-Compatible `/chat/completions`，包含普通请求、SSE 流式、工具调用和部分厂商的 thinking 字段适配。 |
 | Anthropic Messages | `AnthropicClient` 支持 Anthropic Messages 风格接口，并把返回结果适配为库内通用的 Chat Completions 结果模型。 |
-| OpenAI Responses | `ResponsesClient` 已预留为 Responses API 实现入口，便于后续扩展，不影响现有统一接口。 |
+| OpenAI Responses | `ResponsesClient` 已补齐 OpenAI Responses API 的普通请求、SSE 流式、工具调用和统一结果模型适配；当前尚未完成真实接口联调验证。 |
 | SSE 传输 | `SseHttpClient` 已从 Chat Completions 实现中抽出，可作为独立的 SSE HTTP 请求封装复用。 |
 | 工具调用 | 使用 `Tool` 声明函数 schema，通过 `ExecuteToolManager` 执行模型返回的 `tool_calls`，并自动把工具结果写回历史继续对话。 |
 | 内置工具 | `FileTool`、`CommandTool`、`WaitTool`、`WorldStateTool`、`MemoryTool` 等位于 `Silmoon.AI/Tools`。 |
@@ -25,8 +25,8 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 | 值 | 客户端 | 状态 |
 |----|--------|------|
 | `Chat` | `ChatClient` | 当前主力实现，适配 OpenAI-Compatible 厂商。 |
+| `Responses` | `ResponsesClient` | 代码实现已完成，适配 OpenAI Responses API；当前尚未完成真实接口联调验证。 |
 | `Authropic` | `AnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
-| `Responses` | `ResponsesClient` | 预留实现入口，后续完善 Responses API。 |
 
 统一创建方式：
 
@@ -63,8 +63,9 @@ Silmoon.AI/                         核心类库
   SseHttpClient.cs                  独立 SSE HTTP 客户端封装
 
 Silmoon.AI.HostingTest/             统一 INativeClient 调用示例
-Silmoon.AI.ChatCompletionsTest/     OpenAI Chat Completions 原生客户端测试
-Silmoon.AI.AuthropicTest/           Anthropic Messages 原生客户端测试
+Silmoon.AI.ChatClientTest/          OpenAI Chat Completions 原生客户端测试
+Silmoon.AI.AuthropicClientTest/     Anthropic Messages 原生客户端测试
+Silmoon.AI.ResponsesClientTest/     OpenAI Responses 原生客户端测试占位项目
 Silmoon.AI.Terminal/                终端示例
 Silmoon.AI.WinFormTest/             WinForms 示例
 ```
@@ -80,8 +81,8 @@ Silmoon.AI.WinFormTest/             WinForms 示例
   "apiUrl": "https://api.example.com",
   "apiKey": "sk-***",
   "providerName": "deepseek",
-  "modelName": "deepseek-chat",
   "apiKind": "Authropic",
+  "modelName": "deepseek-chat",
   "anthropicVersion": "2023-06-01"
 }
 ```
@@ -93,8 +94,8 @@ OpenAI-Compatible Chat Completions 示例：
   "apiUrl": "https://dashscope.aliyuncs.com/compatible-mode/v1",
   "apiKey": "sk-***",
   "providerName": "aliyun",
-  "modelName": "qwen3.6-plus",
-  "apiKind": "Chat"
+  "apiKind": "Chat",
+  "modelName": "qwen3.6-plus"
 }
 ```
 
@@ -105,9 +106,12 @@ OpenAI-Compatible Chat Completions 示例：
 ```bash
 dotnet restore
 dotnet run --project ./Silmoon.AI.HostingTest/Silmoon.AI.HostingTest.csproj
-dotnet run --project ./Silmoon.AI.ChatCompletionsTest/Silmoon.AI.ChatCompletionsTest.csproj
-dotnet run --project ./Silmoon.AI.AuthropicTest/Silmoon.AI.AuthropicTest.csproj
+dotnet run --project ./Silmoon.AI.ChatClientTest/Silmoon.AI.ChatClientTest.csproj
+dotnet run --project ./Silmoon.AI.AuthropicClientTest/Silmoon.AI.AuthropicClientTest.csproj
+dotnet run --project ./Silmoon.AI.ResponsesClientTest/Silmoon.AI.ResponsesClientTest.csproj
 ```
+
+`Silmoon.AI.ResponsesClientTest` 目前只是为后续 Responses API 联调准备的空测试项目，还没有覆盖真实请求流程。
 
 控制台示例常用命令：
 
