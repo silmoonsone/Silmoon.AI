@@ -6,13 +6,13 @@ using Silmoon.Models;
 
 namespace Silmoon.AI.OpenAI;
 
-public class ChatCompletionsHttpClient : SseHttpClient
+public class ChatHttpClient : SseHttpClient
 {
     public static JsonSerializerSettings SerializerSettings => NativeApiJson.SerializerSettings;
 
-    public ChatCompletionsHttpClient(int? requestTimeoutMilliseconds = null) : base(requestTimeoutMilliseconds) { }
-    public ChatCompletionsHttpClient(bool disableProxy, int? requestTimeoutMilliseconds = null) : base(disableProxy, requestTimeoutMilliseconds) { }
-    public ChatCompletionsHttpClient(HttpClientHandler httpClientHandler, int? requestTimeoutMilliseconds = null) : base(httpClientHandler, requestTimeoutMilliseconds) { }
+    public ChatHttpClient(int? requestTimeoutMilliseconds = null) : base(requestTimeoutMilliseconds) { }
+    public ChatHttpClient(bool disableProxy, int? requestTimeoutMilliseconds = null) : base(disableProxy, requestTimeoutMilliseconds) { }
+    public ChatHttpClient(HttpClientHandler httpClientHandler, int? requestTimeoutMilliseconds = null) : base(httpClientHandler, requestTimeoutMilliseconds) { }
 
     public async Task<StateSet<bool, ChatCompletionsResponse>> CompletionsAsync(string url, ChatCompletionsRequest request)
     {
@@ -23,7 +23,6 @@ public class ChatCompletionsHttpClient : SseHttpClient
         var responseData = JsonConvert.DeserializeObject<ChatCompletionsResponse>(response.Data, SerializerSettings);
         return true.ToStateSet(responseData);
     }
-
     public async Task<StateSet<bool, ChatCompletionsChunk[]>> CompletionsStreamAsync(string url, ChatCompletionsRequest request, Func<StateSet<bool, ChatCompletionsChunk>, Task> callback)
     {
         request.Stream = true;

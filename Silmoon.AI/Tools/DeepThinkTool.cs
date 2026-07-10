@@ -16,10 +16,10 @@ namespace Silmoon.AI.Tools
     {
         public const string CallAgentFunctionName = "DeepThink_Call";
 
-        public INativeChatClient NativeChatClient { get; set; }
-        public DeepThinkTool(INativeChatClient nativeChatClient)
+        public INativeClient NativeClient { get; set; }
+        public DeepThinkTool(INativeClient nativeClient)
         {
-            NativeChatClient = nativeChatClient;
+            NativeClient = nativeClient;
         }
         public override Tool[] GetTools()
         {
@@ -53,11 +53,11 @@ namespace Silmoon.AI.Tools
                 string content = parameters["content"].ToString();
                 //bool reasonContent = parameters["reasonContent"]?.Value<bool>() ?? false;
 
-                if (system is not null) NativeChatClient.SystemPrompt = system;
+                if (system is not null) NativeClient.SystemPrompt = system;
 
                 List<ChatCompletionsChunk> chunks = [];
                 Console.WriteLineWithColor("Agent response start:", ConsoleColor.Green, ConsoleColor.Blue);
-                await foreach (var chunk in NativeChatClient.CompletionsStreamAsync(new List<IMessage> { MessageContent.Create(Role.User, content) }, chunks))
+                await foreach (var chunk in NativeClient.CompletionsStreamAsync(new List<IMessage> { MessageContent.Create(Role.User, content) }, chunks))
                 {
                     if (chunk.State)
                     {

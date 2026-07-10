@@ -2,11 +2,12 @@
 using Silmoon.AI.Interfaces;
 using Silmoon.AI.OpenAI.Models;
 using Silmoon.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
 
-namespace Silmoon.AI.Responses;
+namespace Silmoon.AI.OpenAI;
 
 #pragma warning disable CS0067
-public class NativeResponsesClient : INativeChatClient
+public class ResponsesClient : INativeClient
 {
     public event ToolCallsStartHandler OnToolCallsStart;
     public event ToolCallInvokeHandler OnToolCallInvoke;
@@ -24,7 +25,7 @@ public class NativeResponsesClient : INativeChatClient
     public List<IMessage> MessageHistory { get; set; } = [];
     public ExecuteToolManager ExecuteToolManager { get; set; }
 
-    public NativeResponsesClient(ModelProvider modelProvider, string modelName, string systemPrompt = null)
+    public ResponsesClient(ModelProvider modelProvider, string modelName, string systemPrompt = null)
     {
         ModelProvider = modelProvider;
         ModelName = modelName;
@@ -36,14 +37,14 @@ public class NativeResponsesClient : INativeChatClient
     {
         MessageHistory.Clear();
         if (!string.IsNullOrEmpty(continuation))
-            MessageHistory.Add(MessageContent.Create(OpenAI.Models.Enums.Role.User, continuation));
+            MessageHistory.Add(MessageContent.Create(Role.User, continuation));
     }
 
     public void RollbackHistory(uint rounds = 1)
     {
         while (rounds > 0 && MessageHistory.Count > 0)
         {
-            if (MessageHistory.LastOrDefault().Role == OpenAI.Models.Enums.Role.System) break;
+            if (MessageHistory.LastOrDefault().Role == Role.System) break;
             MessageHistory.RemoveAt(MessageHistory.Count - 1);
             rounds--;
         }
@@ -53,22 +54,22 @@ public class NativeResponsesClient : INativeChatClient
     {
     }
     public IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses") =>
-        throw new NotImplementedException("OpenAI Responses API support is reserved here; use NativeChatCompletionsClient or NativeAnthropicClient until the Responses protocol is implemented.");
+        throw new NotImplementedException("OpenAI Responses API support is reserved here; use ChatClient or AnthropicClient until the Responses protocol is implemented.");
 
     public IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(IMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses") =>
-        throw new NotImplementedException("OpenAI Responses API support is reserved here; use NativeChatCompletionsClient or NativeAnthropicClient until the Responses protocol is implemented.");
+        throw new NotImplementedException("OpenAI Responses API support is reserved here; use ChatClient or AnthropicClient until the Responses protocol is implemented.");
 
     public IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses") =>
-        throw new NotImplementedException("OpenAI Responses API support is reserved here; use NativeChatCompletionsClient or NativeAnthropicClient until the Responses protocol is implemented.");
+        throw new NotImplementedException("OpenAI Responses API support is reserved here; use ChatClient or AnthropicClient until the Responses protocol is implemented.");
 
     public Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses") =>
-        throw new NotImplementedException("OpenAI Responses API support is reserved here; use NativeChatCompletionsClient or NativeAnthropicClient until the Responses protocol is implemented.");
+        throw new NotImplementedException("OpenAI Responses API support is reserved here; use ChatClient or AnthropicClient until the Responses protocol is implemented.");
 
     public Task<ChatCompletionsResponse> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses") =>
-        throw new NotImplementedException("OpenAI Responses API support is reserved here; use NativeChatCompletionsClient or NativeAnthropicClient until the Responses protocol is implemented.");
+        throw new NotImplementedException("OpenAI Responses API support is reserved here; use ChatClient or AnthropicClient until the Responses protocol is implemented.");
 
     public Task<ChatCompletionsResponse> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses") =>
-        throw new NotImplementedException("OpenAI Responses API support is reserved here; use NativeChatCompletionsClient or NativeAnthropicClient until the Responses protocol is implemented.");
+        throw new NotImplementedException("OpenAI Responses API support is reserved here; use ChatClient or AnthropicClient until the Responses protocol is implemented.");
 
     public void Dispose()
     {

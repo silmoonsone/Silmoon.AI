@@ -13,7 +13,7 @@ using Silmoon.Threading;
 
 namespace Silmoon.AI.Anthropic;
 
-public class NativeAnthropicClient : INativeChatClient
+public class AnthropicClient : INativeClient
 {
     public event ToolCallsStartHandler OnToolCallsStart;
     public event ToolCallInvokeHandler OnToolCallInvoke;
@@ -52,7 +52,7 @@ public class NativeAnthropicClient : INativeChatClient
         }
     }
 
-    public NativeAnthropicClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public AnthropicClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
     {
         ModelProvider = provider;
         ModelName = modelName;
@@ -65,8 +65,7 @@ public class NativeAnthropicClient : INativeChatClient
         ExecuteToolManager.OnToolExecuted += async (name, p, r) => await (OnToolExecuted?.Invoke(name, p, r) ?? Task.CompletedTask);
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-
-    public NativeAnthropicClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public AnthropicClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
         : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds)
     {
     }
@@ -120,14 +119,12 @@ public class NativeAnthropicClient : INativeChatClient
         await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
             yield return chunk;
     }
-
     public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(IMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
             yield return chunk;
     }
-
     public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         using var _ = await BusyAsyncLock.LockAsync();
@@ -198,13 +195,11 @@ public class NativeAnthropicClient : INativeChatClient
     }
 
     public Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages") => CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
-
     public async Task<ChatCompletionsResponse> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-
     public async Task<ChatCompletionsResponse> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         using var _ = await BusyAsyncLock.LockAsync();
@@ -308,7 +303,6 @@ public class NativeAnthropicClient : INativeChatClient
 
         return BuildResultFromBlocks(blocks.OrderBy(x => x.Key).Select(x => x.Value), stopReason, usage);
     }
-
     static Result BuildResultFromBlocks(IEnumerable<AnthropicContentBlock> blocks, string stopReason, Usage usage)
     {
         var result = new Result
@@ -379,7 +373,6 @@ public class NativeAnthropicClient : INativeChatClient
             return CreateChunk(model, new ChatCompletionsDelta(), item.Delta?.StopReason == "tool_use" ? "tool_calls" : "stop", item.Usage);
         return null;
     }
-
     static ChatCompletionsChunk CreateChunk(string model, ChatCompletionsDelta delta, string finishReason = null, Usage usage = null) => new()
     {
         Model = model,

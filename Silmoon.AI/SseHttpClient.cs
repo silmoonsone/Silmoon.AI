@@ -32,7 +32,6 @@ public class SseHttpClient : HttpClient
             return false.ToStateSet<string>(null, $"Exception during HTTP request: {ex.Message}");
         }
     }
-
     public async Task<StateSet<bool, string[]>> PostServerSentEventsAsync(string url, string json, Func<StateSet<bool, string>, Task> callback, int maxRetryCount = 0, bool notifyDone = false)
     {
         int retryCount = 0;
@@ -86,9 +85,10 @@ public class SseHttpClient : HttpClient
 
     static HttpRequestMessage CreateJsonPostRequest(string url, string json)
     {
-        var httpRequest = new HttpRequestMessage(HttpMethod.Post, url);
-        httpRequest.Content = new StringContent(json, Encoding.UTF8, "application/json");
-        return httpRequest;
+        return new HttpRequestMessage(HttpMethod.Post, url)
+        {
+            Content = new StringContent(json, Encoding.UTF8, "application/json")
+        };
     }
 }
 

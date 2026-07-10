@@ -13,21 +13,21 @@ namespace Silmoon.AI.Tools
     public abstract class ExecuteTool : IExecuteTool
     {
         public Tool[] Tools { get; set; } = [];
-        INativeChatClient NativeChatClient { get; set; }
+        INativeClient NativeClient { get; set; }
         protected ExecuteTool()
         {
             Tools = GetTools();
         }
         public abstract Tool[] GetTools();
-        public virtual void InjectToolCall(INativeChatClient nativeChatClient)
+        public virtual void InjectToolCall(INativeClient nativeClient)
         {
-            NativeChatClient = nativeChatClient;
-            NativeChatClient.Tools.AddRange(Tools);
-            NativeChatClient.ExecuteToolManager.OnToolCallInvoke += OnToolCallInvoke;
+            NativeClient = nativeClient;
+            NativeClient.Tools.AddRange(Tools);
+            NativeClient.ExecuteToolManager.OnToolCallInvoke += OnToolCallInvoke;
         }
 
-        public async Task NotifyToolExecuting(string functionName, ToolCallParameter toolCallParameter) => await NativeChatClient.ExecuteToolManager.onToolCallExecuting(functionName, toolCallParameter);
-        public async Task NotifyToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await NativeChatClient.ExecuteToolManager.onToolCallExecuted(functionName, toolCallParameter, toolCallResult);
+        public async Task NotifyToolExecuting(string functionName, ToolCallParameter toolCallParameter) => await NativeClient.ExecuteToolManager.onToolCallExecuting(functionName, toolCallParameter);
+        public async Task NotifyToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await NativeClient.ExecuteToolManager.onToolCallExecuted(functionName, toolCallParameter, toolCallResult);
 
         public abstract Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
     }

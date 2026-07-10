@@ -13,7 +13,7 @@ namespace Silmoon.AI.AuthropicTest.Services;
 
 public class ClientService : BackgroundService
 {
-    readonly NativeAnthropicClient client;
+    readonly AnthropicClient client;
     readonly IHostApplicationLifetime applicationLifetime;
 
     bool Streaming { get; set; } = true;
@@ -22,7 +22,7 @@ public class ClientService : BackgroundService
     {
         this.applicationLifetime = applicationLifetime;
         var configure = (SilmoonConfigureServiceImpl)silmoonConfigureService;
-        client = new NativeAnthropicClient(configure.Provider, configure.ModelName, $"{UtilPrompt.ContextPrompt}\r\n{configure.SystemPrompt}", disableProxy: false, httpRequestTimeoutMilliseconds: 120_000);
+        client = new AnthropicClient(configure.Provider, configure.ModelName, $"{UtilPrompt.ContextPrompt}\r\n{configure.SystemPrompt}", disableProxy: false, httpRequestTimeoutMilliseconds: 120_000);
         client.OnToolCallsStart += Client_OnToolCallsStart;
         client.OnToolExecuting += Client_OnToolExecuting;
         client.OnToolExecuted += Client_OnToolExecuted;

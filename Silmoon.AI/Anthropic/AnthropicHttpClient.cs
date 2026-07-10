@@ -10,6 +10,7 @@ public class AnthropicHttpClient : SseHttpClient
 {
     public static JsonSerializerSettings SerializerSettings => NativeApiJson.SerializerSettings;
 
+    public AnthropicHttpClient(int? requestTimeoutMilliseconds = null) : base(requestTimeoutMilliseconds) { }
     public AnthropicHttpClient(bool disableProxy, int? requestTimeoutMilliseconds = null) : base(disableProxy, requestTimeoutMilliseconds) { }
     public AnthropicHttpClient(HttpClientHandler httpClientHandler, int? requestTimeoutMilliseconds = null) : base(httpClientHandler, requestTimeoutMilliseconds) { }
 
@@ -22,7 +23,6 @@ public class AnthropicHttpClient : SseHttpClient
         var responseData = JsonConvert.DeserializeObject<AnthropicResponse>(response.Data, SerializerSettings);
         return true.ToStateSet(responseData);
     }
-
     public async Task<StateSet<bool, AnthropicStreamEvent[]>> MessagesStreamAsync(string url, AnthropicRequest request, Func<StateSet<bool, AnthropicStreamEvent>, Task> callback)
     {
         request.Stream = true;

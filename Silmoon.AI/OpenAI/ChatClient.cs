@@ -13,7 +13,7 @@ using Silmoon.Threading;
 
 namespace Silmoon.AI.OpenAI;
 
-public class NativeChatCompletionsClient : INativeChatClient
+public class ChatClient : INativeClient
 {
     public event ToolCallsStartHandler OnToolCallsStart;
     public event ToolCallInvokeHandler OnToolCallInvoke;
@@ -24,7 +24,7 @@ public class NativeChatCompletionsClient : INativeChatClient
     public event StreamOutputCompletedHandler OnStreamOutputCompleted;
     public ModelProvider ModelProvider { get; set; }
     public string ModelName { get; set; }
-    ChatCompletionsHttpClient HttpClient { get; set; }
+    ChatHttpClient HttpClient { get; set; }
     public ExecuteToolManager ExecuteToolManager { get; set; }
     public ManualResetEvent BusyResetEvent { get; private set; } = new ManualResetEvent(true);
     public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
@@ -51,7 +51,7 @@ public class NativeChatCompletionsClient : INativeChatClient
     }
     public List<Tool> Tools { get; set; } = [];
 
-    public NativeChatCompletionsClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public ChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
     {
         ModelProvider = provider;
         ModelName = modelName;
@@ -68,14 +68,14 @@ public class NativeChatCompletionsClient : INativeChatClient
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public NativeChatCompletionsClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
+    public ChatClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
     {
     }
 
     void BuildHttpClient(bool disableProxy, int? httpRequestTimeoutMilliseconds)
     {
         HttpClient?.Dispose();
-        HttpClient = new ChatCompletionsHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
+        HttpClient = new ChatHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
     public void RebuildHttpClient()
@@ -293,20 +293,6 @@ public class NativeChatCompletionsClient : INativeChatClient
         HttpClient.Dispose();
         BusyResetEvent.Dispose();
         BusyAsyncLock.Dispose();
-    }
-}
-
-[Obsolete("Use NativeChatCompletionsClient. This name is kept only for compatibility.")]
-public class NativeChatClient : NativeChatCompletionsClient
-{
-    public NativeChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
-        : base(provider, modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
-    {
-    }
-
-    public NativeChatClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
-        : base(apiUrl, apiKey, providerName, modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
-    {
     }
 }
 

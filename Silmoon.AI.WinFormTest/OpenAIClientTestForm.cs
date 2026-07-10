@@ -21,7 +21,7 @@ namespace Silmoon.AI.WinFormTest
 {
     public partial class OpenAIClientTestForm : Form
     {
-        NativeChatCompletionsClient NativeChatCompletionsClient { get; set; }
+        ChatClient NativeClient { get; set; }
         SilmoonConfigureService ConfigureService { get; set; }
 
         public OpenAIClientTestForm()
@@ -37,31 +37,31 @@ namespace Silmoon.AI.WinFormTest
 
             var systemPrompt = textBox1.Text;
             systemPrompt = MakeSystemPrompt();
-            NativeChatCompletionsClient = new NativeChatCompletionsClient(ConfigureService.ConfigJson.Value<string>("apiUrl"), ConfigureService.ConfigJson.Value<string>("apiKey"), ConfigureService.ConfigJson.Value<string>("providerName"), ConfigureService.ConfigJson.Value<string>("modelName"), systemPrompt);
-            NativeChatCompletionsClient.OnToolCallsStart += NativeChatClient_OnToolCallsStart;
-            NativeChatCompletionsClient.OnToolExecuting += NativeChatClient_OnToolExecuting;
-            NativeChatCompletionsClient.OnToolExecuted += NativeChatClient_OnToolExecuted;
-            NativeChatCompletionsClient.OnToolCallsFinish += NativeChatClient_OnToolCallsFinish;
-            NativeChatCompletionsClient.OnStreamOutputCompleted += NativeChatClient_OnStreamOutputCompleted;
-            NativeChatCompletionsClient.Tools.AddRange(makeTools());
-            new FileTool().InjectToolCall(NativeChatCompletionsClient);
-            new CommandTool().InjectToolCall(NativeChatCompletionsClient);
-            new WaitTool().InjectToolCall(NativeChatCompletionsClient);
-            new WorldStateTool().InjectToolCall(NativeChatCompletionsClient);
+            NativeClient = new ChatClient(ConfigureService.ConfigJson.Value<string>("apiUrl"), ConfigureService.ConfigJson.Value<string>("apiKey"), ConfigureService.ConfigJson.Value<string>("providerName"), ConfigureService.ConfigJson.Value<string>("modelName"), systemPrompt);
+            NativeClient.OnToolCallsStart += NativeClient_OnToolCallsStart;
+            NativeClient.OnToolExecuting += NativeClient_OnToolExecuting;
+            NativeClient.OnToolExecuted += NativeClient_OnToolExecuted;
+            NativeClient.OnToolCallsFinish += NativeClient_OnToolCallsFinish;
+            NativeClient.OnStreamOutputCompleted += NativeClient_OnStreamOutputCompleted;
+            NativeClient.Tools.AddRange(makeTools());
+            new FileTool().InjectToolCall(NativeClient);
+            new CommandTool().InjectToolCall(NativeClient);
+            new WaitTool().InjectToolCall(NativeClient);
+            new WorldStateTool().InjectToolCall(NativeClient);
             // Inject 须在宿主 OnToolCallStart 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool 对未知函数名的结果
-            new MemoryTool(NativeChatCompletionsClient).InjectToolCall(NativeChatCompletionsClient);
+            new MemoryTool(NativeClient).InjectToolCall(NativeClient);
         }
 
-        private async Task NativeChatClient_OnToolCallsStart(ToolCallParameter[] toolCallParameters)
+        private async Task NativeClient_OnToolCallsStart(ToolCallParameter[] toolCallParameters)
         {
             Console.WriteLineWithColor($"[TOOL CALLS] {string.Join(',', toolCallParameters.Select(x => x.FunctionName))}", ConsoleColor.Yellow);
         }
-        private Task NativeChatClient_OnToolExecuting(string functionName, ToolCallParameter toolCallParameter)
+        private Task NativeClient_OnToolExecuting(string functionName, ToolCallParameter toolCallParameter)
         {
             Console.WriteLineWithColor($"[Tool Executing] ({functionName}) is executing.", ConsoleColor.Cyan);
             return Task.CompletedTask;
         }
-        private Task NativeChatClient_OnToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
+        private Task NativeClient_OnToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
         {
             if (toolCallResult is not null)
             {
@@ -74,13 +74,13 @@ namespace Silmoon.AI.WinFormTest
                 Console.WriteLineWithColor($"[Tool Executed] ({functionName}) executed with no any result", ConsoleColor.Red);
             return Task.CompletedTask;
         }
-        private Task<ToolCallResult[]> NativeChatClient_OnToolCallsFinish(ToolCallParameter[] toolCallParameters, ToolCallResult[] toolCallResults)
+        private Task<ToolCallResult[]> NativeClient_OnToolCallsFinish(ToolCallParameter[] toolCallParameters, ToolCallResult[] toolCallResults)
         {
             Console.WriteLineWithColor($"[TOOL CALLS RESULTS] {string.Join(", ", toolCallParameters.Select(x => $"{x.FunctionName}: {toolCallResults.FirstOrDefault(y => y.Parameter.FunctionName == x.FunctionName)?.Result.State}"))}", ConsoleColor.Yellow);
             return Task.FromResult(toolCallResults);
         }
 
-        private async Task NativeChatClient_OnStreamOutputCompleted(Result result)
+        private async Task NativeClient_OnStreamOutputCompleted(Result result)
         {
             Console.WriteLine();
             Console.WriteLine("stop reason: " + result.FinishReason);
@@ -120,7 +120,7 @@ namespace Silmoon.AI.WinFormTest
 
 
             List<ChatCompletionsChunk> chunks = [];
-            await foreach (var chunk in NativeChatCompletionsClient.CompletionsStreamAsync(userPrompt, chunks))
+            await foreach (var chunk in NativeClient.CompletionsStreamAsync(userPrompt, chunks))
             {
                 if (chunk.State)
                 {

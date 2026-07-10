@@ -2,16 +2,16 @@
 
 Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊天、流式输出、工具调用和简单 Agent 场景。
 
-当前版本把不同厂商和不同原生接口抽象到统一的 `INativeChatClient` 上，同时保留各接口的原生客户端，便于单独调试协议行为。
+当前版本把不同厂商和不同原生接口抽象到统一的 `INativeClient` 上，同时保留各接口的原生客户端，便于单独调试协议行为。
 
 ## 主要能力
 
 | 能力 | 说明 |
 |------|------|
-| 统一客户端 | 通过 `NativeChatClientFactory.Create(...)` 根据 `ModelProvider.ApiKind` 创建统一的 `INativeChatClient`。 |
-| OpenAI Chat Completions | `NativeChatCompletionsClient` 支持 OpenAI-Compatible `/chat/completions`，包含普通请求、SSE 流式、工具调用和部分厂商的 thinking 字段适配。 |
-| Anthropic Messages | `NativeAnthropicClient` 支持 Anthropic Messages 风格接口，并把返回结果适配为库内通用的 Chat Completions 结果模型。 |
-| OpenAI Responses | `NativeResponsesClient` 已预留为 Responses API 实现入口，便于后续扩展，不影响现有统一接口。 |
+| 统一客户端 | 通过 `NativeClientFactory.Create(...)` 根据 `ModelProvider.ApiKind` 创建统一的 `INativeClient`。 |
+| OpenAI Chat Completions | `ChatClient` 支持 OpenAI-Compatible `/chat/completions`，包含普通请求、SSE 流式、工具调用和部分厂商的 thinking 字段适配。 |
+| Anthropic Messages | `AnthropicClient` 支持 Anthropic Messages 风格接口，并把返回结果适配为库内通用的 Chat Completions 结果模型。 |
+| OpenAI Responses | `ResponsesClient` 已预留为 Responses API 实现入口，便于后续扩展，不影响现有统一接口。 |
 | SSE 传输 | `SseHttpClient` 已从 Chat Completions 实现中抽出，可作为独立的 SSE HTTP 请求封装复用。 |
 | 工具调用 | 使用 `Tool` 声明函数 schema，通过 `ExecuteToolManager` 执行模型返回的 `tool_calls`，并自动把工具结果写回历史继续对话。 |
 | 内置工具 | `FileTool`、`CommandTool`、`WaitTool`、`WorldStateTool`、`MemoryTool` 等位于 `Silmoon.AI/Tools`。 |
@@ -24,9 +24,9 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 
 | 值 | 客户端 | 状态 |
 |----|--------|------|
-| `Chat` | `NativeChatCompletionsClient` | 当前主力实现，适配 OpenAI-Compatible 厂商。 |
-| `Authropic` | `NativeAnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
-| `Responses` | `NativeResponsesClient` | 预留实现入口，后续完善 Responses API。 |
+| `Chat` | `ChatClient` | 当前主力实现，适配 OpenAI-Compatible 厂商。 |
+| `Authropic` | `AnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
+| `Responses` | `ResponsesClient` | 预留实现入口，后续完善 Responses API。 |
 
 统一创建方式：
 
@@ -45,7 +45,7 @@ var provider = new ModelProvider
     Models = [new Model { Name = "deepseek-chat" }]
 };
 
-using INativeChatClient client = NativeChatClientFactory.Create(
+using INativeClient client = NativeClientFactory.Create(
     provider,
     modelName: "deepseek-chat",
     systemPrompt: "你是一个简洁的中文助手。");
@@ -56,14 +56,13 @@ using INativeChatClient client = NativeChatClientFactory.Create(
 ```text
 Silmoon.AI/                         核心类库
   Anthropic/                        Anthropic Messages 原生客户端和模型
-  OpenAI/                           OpenAI Chat Completions 原生客户端和模型
-  Responses/                        OpenAI Responses 预留客户端
-  Interfaces/                       INativeChatClient 等公共接口
+  OpenAI/                           OpenAI Chat Completions / Responses 原生客户端和模型
+  Interfaces/                       INativeClient 等公共接口
   Models/                           跨接口共享模型
   Tools/                            内置工具
   SseHttpClient.cs                  独立 SSE HTTP 客户端封装
 
-Silmoon.AI.HostingTest/             统一 INativeChatClient 调用示例
+Silmoon.AI.HostingTest/             统一 INativeClient 调用示例
 Silmoon.AI.ChatCompletionsTest/     OpenAI Chat Completions 原生客户端测试
 Silmoon.AI.AuthropicTest/           Anthropic Messages 原生客户端测试
 Silmoon.AI.Terminal/                终端示例
@@ -138,7 +137,7 @@ var provider = new ModelProvider
     Models = [new Model { Name = "qwen3.6-plus" }]
 };
 
-using INativeChatClient client = NativeChatClientFactory.Create(
+using INativeClient client = NativeClientFactory.Create(
     provider,
     modelName: "qwen3.6-plus",
     systemPrompt: "用简短中文回答。");

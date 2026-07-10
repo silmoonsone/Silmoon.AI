@@ -16,7 +16,7 @@ namespace Silmoon.AI.HostingTest.Services;
 
 public class ClientService : BackgroundService
 {
-    INativeChatClient Client { get; set; }
+    INativeClient Client { get; set; }
     SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
     IHostApplicationLifetime ApplicationLifetime { get; set; }
     bool Streaming { get; set; } = true;
@@ -24,12 +24,12 @@ public class ClientService : BackgroundService
     {
         ApplicationLifetime = applicationLifetime;
         SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
-        Client = NativeChatClientFactory.Create(SilmoonConfigureService.Provider, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
-        Client.OnToolCallsStart += NativeChatClient_OnToolCallsStart;
-        Client.OnToolExecuting += NativeChatClient_OnToolExecuting;
-        Client.OnToolExecuted += NativeChatClient_OnToolExecuted;
-        Client.OnToolCallsFinish += NativeChatClient_OnToolCallsFinish;
-        Client.OnStreamOutputCompleted += NativeChatClient_OnStreamOutputCompleted;
+        Client = NativeClientFactory.Create(SilmoonConfigureService.Provider, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
+        Client.OnToolCallsStart += NativeClient_OnToolCallsStart;
+        Client.OnToolExecuting += NativeClient_OnToolExecuting;
+        Client.OnToolExecuted += NativeClient_OnToolExecuted;
+        Client.OnToolCallsFinish += NativeClient_OnToolCallsFinish;
+        Client.OnStreamOutputCompleted += NativeClient_OnStreamOutputCompleted;
         Client.Tools.AddRange(makeTools());
         new FileTool().InjectToolCall(Client);
         new CommandTool().InjectToolCall(Client);
@@ -40,16 +40,16 @@ public class ClientService : BackgroundService
         //Client.EnableThinking = true;
     }
 
-    private async Task NativeChatClient_OnToolCallsStart(ToolCallParameter[] toolCallParameters)
+    private async Task NativeClient_OnToolCallsStart(ToolCallParameter[] toolCallParameters)
     {
         Console.WriteLineWithColor($"[TOOL CALLS] {string.Join(',', toolCallParameters.Select(x => x.FunctionName))}", ConsoleColor.Yellow);
     }
-    private Task NativeChatClient_OnToolExecuting(string functionName, ToolCallParameter toolCallParameter)
+    private Task NativeClient_OnToolExecuting(string functionName, ToolCallParameter toolCallParameter)
     {
         Console.WriteLineWithColor($"[Tool Executing] ({functionName}) is executing.", ConsoleColor.Cyan);
         return Task.CompletedTask;
     }
-    private Task NativeChatClient_OnToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
+    private Task NativeClient_OnToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
     {
         if (toolCallResult is not null)
         {
@@ -62,13 +62,13 @@ public class ClientService : BackgroundService
             Console.WriteLineWithColor($"[Tool Executed] ({functionName}) executed with no any result", ConsoleColor.Red);
         return Task.CompletedTask;
     }
-    private Task<ToolCallResult[]> NativeChatClient_OnToolCallsFinish(ToolCallParameter[] toolCallParameters, ToolCallResult[] toolCallResults)
+    private Task<ToolCallResult[]> NativeClient_OnToolCallsFinish(ToolCallParameter[] toolCallParameters, ToolCallResult[] toolCallResults)
     {
         Console.WriteLineWithColor($"[TOOL CALLS RESULTS] {string.Join(", ", toolCallParameters.Select(x => $"{x.FunctionName}: {toolCallResults.FirstOrDefault(y => y.Parameter.FunctionName == x.FunctionName)?.Result.State}"))}", ConsoleColor.Yellow);
         return Task.FromResult(toolCallResults);
     }
 
-    private async Task NativeChatClient_OnStreamOutputCompleted(Result result)
+    private async Task NativeClient_OnStreamOutputCompleted(Result result)
     {
         Console.WriteLine();
         Console.WriteLine("stop reason: " + result.FinishReason);

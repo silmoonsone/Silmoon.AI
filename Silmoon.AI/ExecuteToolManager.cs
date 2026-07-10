@@ -18,10 +18,10 @@ namespace Silmoon.AI
         public event ToolExecutingHandler OnToolExecuting;
         public event ToolExecutedHandler OnToolExecuted;
         public List<IExecuteTool> Tools { get; private set; } = [];
-        INativeChatClient NativeChatClient { get; set; }
-        public ExecuteToolManager(INativeChatClient nativeChatClient)
+        INativeClient NativeClient { get; set; }
+        public ExecuteToolManager(INativeClient nativeClient)
         {
-            NativeChatClient = nativeChatClient;
+            NativeClient = nativeClient;
         }
         public StateSet<bool, IExecuteTool> AddExecuteTool(IExecuteTool tool)
         {
@@ -30,7 +30,7 @@ namespace Silmoon.AI
                 var existsFunctionTool = Tools.Where(x => x.Tools.Any(y => y.Function == item.Function));
                 if (existsFunctionTool.Any()) return false.ToStateSet(existsFunctionTool.FirstOrDefault(), "此Tool Function已存在。");
             }
-            tool.InjectToolCall(NativeChatClient);
+            tool.InjectToolCall(NativeClient);
             Tools.Add(tool);
             return true.ToStateSet(tool);
         }

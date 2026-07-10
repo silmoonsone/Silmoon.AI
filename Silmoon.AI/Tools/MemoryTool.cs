@@ -67,11 +67,11 @@ public class MemoryTool : ExecuteTool
 
         """;
 
-    public INativeChatClient NativeChatClient { get; set; }
+    public INativeClient NativeClient { get; set; }
 
-    public MemoryTool(INativeChatClient nativeChatClient)
+    public MemoryTool(INativeClient nativeClient)
     {
-        NativeChatClient = nativeChatClient;
+        NativeClient = nativeClient;
     }
 
     public override Tool[] GetTools()
@@ -107,7 +107,7 @@ public class MemoryTool : ExecuteTool
             {
                 await NotifyToolExecuting(functionName, toolCallParameter);
                 rawParam = UserMessagePrefix.IsNullOrEmpty() ? rawParam : UserMessagePrefix + rawParam;
-                NativeChatClient.ClearHistory(rawParam);
+                NativeClient.ClearHistory(rawParam);
                 var resetPayload = new JObject
                 {
                     ["ok"] = true,
