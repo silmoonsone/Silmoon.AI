@@ -6,8 +6,8 @@ namespace Silmoon.AI.Models;
 [JsonConverter(typeof(StringEnumConverter))]
 public enum NativeApiKind
 {
-    OpenAIChatCompletions,
-    AnthropicMessages,
-    OpenAIResponses,
+    Chat = 0,
+    Responses = 1,
+    Authropic = 2,
 }
 

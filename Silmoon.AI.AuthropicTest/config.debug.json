@@ -3,6 +3,6 @@
   "apiKey": "sk-***",
   "providerName": "deepseek",
   "modelName": "deepseek-v4-flash",
-  "apiKind": "AnthropicMessages",
+  "apiKind": "Authropic",
   "anthropicVersion": "2023-06-01"
 }

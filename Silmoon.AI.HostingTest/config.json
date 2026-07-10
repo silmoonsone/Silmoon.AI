@@ -3,5 +3,5 @@
   "apiKey": "sk-***",
   "providerName": "aliyun",
   "modelName": "qwen3.6-plus",
-  "apiKind": "OpenAIChatCompletions"
+  "apiKind": "Chat"
 }

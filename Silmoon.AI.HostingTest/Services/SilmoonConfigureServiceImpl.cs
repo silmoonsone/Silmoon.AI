@@ -28,7 +28,7 @@ namespace Silmoon.AI.HostingTest.Services
             Key = ConfigJson["apiKey"]?.Value<string>();
             ProviderName = ConfigJson["providerName"]?.Value<string>() ?? "openai";
             ModelName = ConfigJson["modelName"]?.Value<string>();
-            ApiKind = Enum.TryParse(ConfigJson["apiKind"]?.Value<string>(), true, out NativeApiKind apiKind) ? apiKind : NativeApiKind.OpenAIChatCompletions;
+            ApiKind = Enum.TryParse(ConfigJson["apiKind"]?.Value<string>(), true, out NativeApiKind apiKind) ? apiKind : NativeApiKind.Chat;
             AnthropicVersion = ConfigJson["anthropicVersion"]?.Value<string>() ?? "2023-06-01";
 
             Provider = new ModelProvider

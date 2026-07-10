@@ -23,7 +23,7 @@ public class SilmoonConfigureServiceImpl : SilmoonConfigureService
             ProviderName = ConfigJson["providerName"]?.Value<string>() ?? "deepseek",
             ApiUrl = ConfigJson["apiUrl"]?.Value<string>() ?? "https://api.deepseek.com/anthropic",
             ApiKey = ConfigJson["apiKey"]?.Value<string>() ?? string.Empty,
-            ApiKind = NativeApiKind.AnthropicMessages,
+            ApiKind = NativeApiKind.Authropic,
             AnthropicVersion = ConfigJson["anthropicVersion"]?.Value<string>() ?? "2023-06-01",
         };
         ModelName = ConfigJson["modelName"]?.Value<string>() ?? "deepseek-v4-flash";

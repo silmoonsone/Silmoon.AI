@@ -24,9 +24,9 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 
 | 值 | 客户端 | 状态 |
 |----|--------|------|
-| `OpenAIChatCompletions` | `NativeChatCompletionsClient` | 当前主力实现，适配 OpenAI-Compatible 厂商。 |
-| `AnthropicMessages` | `NativeAnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
-| `OpenAIResponses` | `NativeResponsesClient` | 预留实现入口，后续完善 Responses API。 |
+| `Chat` | `NativeChatCompletionsClient` | 当前主力实现，适配 OpenAI-Compatible 厂商。 |
+| `Authropic` | `NativeAnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
+| `Responses` | `NativeResponsesClient` | 预留实现入口，后续完善 Responses API。 |
 
 统一创建方式：
 
@@ -40,7 +40,7 @@ var provider = new ModelProvider
     ProviderName = "deepseek",
     ApiUrl = "https://api.example.com",
     ApiKey = "sk-***",
-    ApiKind = NativeApiKind.AnthropicMessages,
+    ApiKind = NativeApiKind.Authropic,
     AnthropicVersion = "2023-06-01",
     Models = [new Model { Name = "deepseek-chat" }]
 };
@@ -82,7 +82,7 @@ Silmoon.AI.WinFormTest/             WinForms 示例
   "apiKey": "sk-***",
   "providerName": "deepseek",
   "modelName": "deepseek-chat",
-  "apiKind": "AnthropicMessages",
+  "apiKind": "Authropic",
   "anthropicVersion": "2023-06-01"
 }
 ```
@@ -95,7 +95,7 @@ OpenAI-Compatible Chat Completions 示例：
   "apiKey": "sk-***",
   "providerName": "aliyun",
   "modelName": "qwen3.6-plus",
-  "apiKind": "OpenAIChatCompletions"
+  "apiKind": "Chat"
 }
 ```
 
@@ -134,7 +134,7 @@ var provider = new ModelProvider
     ProviderName = "aliyun",
     ApiUrl = "https://dashscope.aliyuncs.com/compatible-mode/v1",
     ApiKey = "sk-***",
-    ApiKind = NativeApiKind.OpenAIChatCompletions,
+    ApiKind = NativeApiKind.Chat,
     Models = [new Model { Name = "qwen3.6-plus" }]
 };
 

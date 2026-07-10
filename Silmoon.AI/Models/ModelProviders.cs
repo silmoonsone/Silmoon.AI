@@ -16,7 +16,7 @@ namespace Silmoon.AI.Models
         [JsonProperty("apiKey")]
         public string ApiKey { get; set; }
         [JsonProperty("apiKind")]
-        public NativeApiKind ApiKind { get; set; } = NativeApiKind.OpenAIChatCompletions;
+        public NativeApiKind ApiKind { get; set; } = NativeApiKind.Chat;
         [JsonProperty("anthropicVersion")]
         public string AnthropicVersion { get; set; } = "2023-06-01";
         [JsonProperty("enable")]

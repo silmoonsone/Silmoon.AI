@@ -11,8 +11,8 @@ public static class NativeChatClientFactory
     public static INativeChatClient Create(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) =>
         provider.ApiKind switch
         {
-            NativeApiKind.AnthropicMessages => new NativeAnthropicClient(provider, modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds),
-            NativeApiKind.OpenAIResponses => new NativeResponsesClient(provider, modelName, systemPrompt),
+            NativeApiKind.Authropic => new NativeAnthropicClient(provider, modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds),
+            NativeApiKind.Responses => new NativeResponsesClient(provider, modelName, systemPrompt),
             _ => new NativeChatCompletionsClient(provider, modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds),
         };
 }
