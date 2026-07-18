@@ -6,7 +6,7 @@ namespace Silmoon.AI.OpenAI.Models;
 public class ChatCompletionsChoice
 {
     [JsonProperty("message")]
-    public MessageContent Message { get; set; }
+    public NativeMessageContent Message { get; set; }
     [JsonProperty("finish_reason")]
     public string FinishReason { get; set; }
     [JsonProperty("index")]

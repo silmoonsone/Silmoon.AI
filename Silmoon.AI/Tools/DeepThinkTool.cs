@@ -57,7 +57,7 @@ namespace Silmoon.AI.Tools
 
                 List<ChatCompletionsChunk> chunks = [];
                 Console.WriteLineWithColor("Agent response start:", ConsoleColor.Green, ConsoleColor.Blue);
-                await foreach (var chunk in NativeClient.CompletionsStreamAsync(MessageCollection.CreateOneUserMessage(content), chunks))
+                await foreach (var chunk in NativeClient.CompletionsStreamAsync(NativeMessageCollection.CreateSingleNativeMessage(content), chunks))
                 {
                     if (chunk.State)
                     {

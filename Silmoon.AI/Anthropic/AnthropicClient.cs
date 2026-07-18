@@ -27,7 +27,7 @@ public class AnthropicClient : INativeClient
     public string ModelName { get; set; }
     public ExecuteToolManager ExecuteToolManager { get; set; }
     public List<Tool> Tools { get; set; } = [];
-    public MessageCollection MessageHistory { get; set; } = [];
+    public NativeMessageCollection MessageHistory { get; set; } = [];
     public bool EnableThinking { get; set; } = false;
     public ManualResetEvent BusyResetEvent { get; private set; } = new(true);
     public AsyncLock BusyAsyncLock { get; private set; } = new();
@@ -36,17 +36,17 @@ public class AnthropicClient : INativeClient
 
     public string SystemPrompt
     {
-        get => (MessageHistory.FirstOrDefault(m => m.Role == Role.System) as MessageContent)?.Content;
+        get => (MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent)?.Content;
         set
         {
-            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System) as MessageContent;
+            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent;
             if (value is null)
             {
                 if (systemMessage is not null) MessageHistory.Remove(systemMessage);
             }
             else
             {
-                if (systemMessage is null) MessageHistory.Insert(0, MessageContent.Create(Role.System, value));
+                if (systemMessage is null) MessageHistory.Insert(0, NativeMessageContent.Create(Role.System, value));
                 else systemMessage.Content = value;
             }
         }
@@ -89,23 +89,23 @@ public class AnthropicClient : INativeClient
     {
         var systemPrompt = SystemPrompt;
         MessageHistory.Clear();
-        if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, systemPrompt));
-        if (!continuation.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.User, continuation));
+        if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.System, systemPrompt));
+        if (!continuation.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.User, continuation));
     }
 
     public void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
     public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
-        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
+        await foreach (var chunk in CompletionsStreamAsync(NativeMessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
             yield return chunk;
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(IMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
             yield return chunk;
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(MessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -150,7 +150,7 @@ public class AnthropicClient : INativeClient
                 await (OnStreamOutputCompleted?.Invoke(result) ?? Task.CompletedTask);
                 if (result.FinishReason == "tool_calls" && !result.ToolCalls.IsNullOrEmpty())
                 {
-                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
+                    messageHistory.Add(NativeMessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
                     var parameters = ToolCallParameter.Create(result.ToolCalls);
                     var toolCallResults = await ExecuteToolManager.ToolCalls(parameters);
                     if (parameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
@@ -159,12 +159,12 @@ public class AnthropicClient : INativeClient
                     else
                     {
                         foreach (var item in toolCallResults)
-                            messageHistory.Add(MessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
+                            messageHistory.Add(NativeMessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
                     }
                     continue;
                 }
 
-                messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content));
+                messageHistory.Add(NativeMessageContent.Create(Role.Assistant, result.Content));
                 break;
             }
         }
@@ -174,13 +174,13 @@ public class AnthropicClient : INativeClient
         }
     }
 
-    public Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages") => CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
-    public async Task<ChatCompletionsResponse> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages") => CompletionsAsync(NativeMessageContent.Create(Role.User, content), tools, model, completionsUrl);
+    public async Task<ChatCompletionsResponse> CompletionsAsync(INativeMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<ChatCompletionsResponse> CompletionsAsync(MessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public async Task<ChatCompletionsResponse> CompletionsAsync(NativeMessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -192,22 +192,22 @@ public class AnthropicClient : INativeClient
                 var request = AnthropicMessageAdapter.CreateRequest(model, messageHistory, SystemPrompt, tools ?? Tools);
                 var responseState = await HttpClient.MessagesAsync(BuildUrl(completionsUrl), request);
                 if (!responseState.State)
-                    return new ChatCompletionsResponse { Choices = [new ChatCompletionsChoice { FinishReason = "error", Message = MessageContent.Create(Role.Assistant, responseState.Message) }], Model = model };
+                    return new ChatCompletionsResponse { Choices = [new ChatCompletionsChoice { FinishReason = "error", Message = NativeMessageContent.Create(Role.Assistant, responseState.Message) }], Model = model };
 
                 var response = ConvertResponse(responseState.Data);
                 var firstChoice = response.Choices.FirstOrDefault();
                 if (firstChoice?.FinishReason == "tool_calls" && !firstChoice.Message.ToolCalls.IsNullOrEmpty())
                 {
-                    messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice.Message.Content, [.. firstChoice.Message.ToolCalls]));
+                    messageHistory.Add(NativeMessageContent.Create(Role.Assistant, firstChoice.Message.Content, [.. firstChoice.Message.ToolCalls]));
                     var parameters = ToolCallParameter.Create(firstChoice.Message.ToolCalls);
                     var toolCallResults = await ExecuteToolManager.ToolCalls(parameters);
                     foreach (var item in toolCallResults)
-                        messageHistory.Add(MessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
+                        messageHistory.Add(NativeMessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
                     continue;
                 }
 
                 if (firstChoice is not null)
-                    messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice.Message.Content));
+                    messageHistory.Add(NativeMessageContent.Create(Role.Assistant, firstChoice.Message.Content));
                 return response;
             }
         }
@@ -238,7 +238,7 @@ public class AnthropicClient : INativeClient
                 {
                     Index = 0,
                     FinishReason = result.FinishReason,
-                    Message = MessageContent.Create(Role.Assistant, result.Content, result.ToolCalls),
+                    Message = NativeMessageContent.Create(Role.Assistant, result.Content, result.ToolCalls),
                 }
             ],
         };

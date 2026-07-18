@@ -10,7 +10,7 @@ public class ChatCompletionsRequest
     [JsonProperty("model")]
     public string Model { get; set; }
     [JsonProperty("messages")]
-    public IMessage[] Messages { get; set; }
+    public INativeMessage[] Messages { get; set; }
     [JsonProperty("stream")]
     public bool? Stream { get; set; }
     [JsonProperty("temperature")]
@@ -24,7 +24,7 @@ public class ChatCompletionsRequest
     [JsonIgnore]
     public JObject ExtraBody { get; set; } = new JObject();
     public bool ShouldSerializeTools() => Tools != null && Tools.Count > 0;
-    public ChatCompletionsRequest(string model, IMessage[] messages, bool stream = true)
+    public ChatCompletionsRequest(string model, INativeMessage[] messages, bool stream = true)
     {
         Model = model;
         Messages = messages;
@@ -85,7 +85,7 @@ public class ChatCompletionsRequest
 [Obsolete("Use ChatCompletionsRequest. This alias is kept for source compatibility.")]
 public class Request : ChatCompletionsRequest
 {
-    public Request(string model, IMessage[] messages, bool stream = true) : base(model, messages, stream)
+    public Request(string model, INativeMessage[] messages, bool stream = true) : base(model, messages, stream)
     {
     }
 }

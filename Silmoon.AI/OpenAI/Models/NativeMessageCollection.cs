@@ -5,27 +5,27 @@ using Silmoon.AI.OpenAI.Models.Enums;
 namespace Silmoon.AI.OpenAI.Models;
 
 [JsonArray]
-public class MessageCollection : Collection<IMessage>
+public class NativeMessageCollection : Collection<INativeMessage>
 {
-    public MessageCollection()
+    public NativeMessageCollection()
     {
     }
 
-    public MessageCollection(IEnumerable<IMessage> messages)
+    public NativeMessageCollection(IEnumerable<INativeMessage> messages)
     {
         foreach (var message in messages ?? [])
             Add(message);
     }
 
-    public static MessageCollection Create(IEnumerable<IMessage> messages) => new(messages);
+    public static NativeMessageCollection Create(IEnumerable<INativeMessage> messages) => new(messages);
 
-    protected override void InsertItem(int index, IMessage item)
+    protected override void InsertItem(int index, INativeMessage item)
     {
         EnsureMessageHash(item);
         base.InsertItem(index, item);
     }
 
-    protected override void SetItem(int index, IMessage item)
+    protected override void SetItem(int index, INativeMessage item)
     {
         EnsureMessageHash(item);
         base.SetItem(index, item);
@@ -41,9 +41,14 @@ public class MessageCollection : Collection<IMessage>
         base.ClearItems();
     }
 
-    public static implicit operator MessageCollection(List<IMessage> messages) => new(messages);
-    public static MessageCollection CreateOneUserMessage(string content) => [MessageContent.Create(Role.User, content)];
-    public static MessageCollection CreateOneUserMessage(string content, string systemPrompt) => [MessageContent.Create(Role.System, systemPrompt), MessageContent.Create(Role.User, content)];
+    public static implicit operator NativeMessageCollection(List<INativeMessage> messages) => new(messages);
+    public static NativeMessageCollection CreateSingleNativeMessage(string content, string systemPrompt = null)
+    {
+        if (systemPrompt is null)
+            return [NativeMessageContent.Create(Role.User, content)];
+        else
+            return [NativeMessageContent.Create(Role.System, systemPrompt), NativeMessageContent.Create(Role.User, content)];
+    }
 
     public uint RollbackRounds(uint rounds = 1)
     {
@@ -100,7 +105,7 @@ public class MessageCollection : Collection<IMessage>
         return -1;
     }
 
-    static void EnsureMessageHash(IMessage item)
+    static void EnsureMessageHash(INativeMessage item)
     {
         if (item is not null && string.IsNullOrEmpty(item.Hash))
             item.Hash = Guid.NewGuid().ToString("N");

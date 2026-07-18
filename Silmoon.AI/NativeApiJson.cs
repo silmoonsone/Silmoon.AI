@@ -19,7 +19,7 @@ public static class NativeApiJson
     {
         NullValueHandling = NullValueHandling.Ignore,
         MissingMemberHandling = MissingMemberHandling.Ignore,
-        TypeNameHandling = TypeNameHandling.Auto,
+        TypeNameHandling = TypeNameHandling.None,
         SerializationBinder = new NativeApiSerializationBinder(),
         ContractResolver = new NativeApiRequestContractResolver(),
     };
@@ -30,7 +30,7 @@ public class NativeApiRequestContractResolver : DefaultContractResolver
     protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
     {
         var property = base.CreateProperty(member, memberSerialization);
-        if (property.PropertyName == "hash" && property.DeclaringType is not null && typeof(IMessage).IsAssignableFrom(property.DeclaringType))
+        if (property.PropertyName == "hash" && property.DeclaringType is not null && typeof(INativeMessage).IsAssignableFrom(property.DeclaringType))
             property.Ignored = true;
         return property;
     }
@@ -69,6 +69,13 @@ public class NativeApiSerializationBinder : ISerializationBinder
     static string MapLegacyTypeName(string typeName)
     {
         return typeName
+            .Replace(".MessageContent", ".NativeMessageContent")
+            .Replace(".MessageJson", ".NativeMessageJson")
+            .Replace(".MessageImageUrl", ".NativeMessageImageUrl")
+            .Replace(".MessageText", ".NativeMessageText")
+            .Replace(".Messages`1", ".NativeMessages`1")
+            .Replace(".Message`1", ".NativeMessage`1")
+            .Replace(".Message,", ".NativeMessage,")
             .Replace("Silmoon.AI.Models.OpenAI.Models.", "Silmoon.AI.OpenAI.Models.")
             .Replace("Silmoon.AI.Models.OpenAI.Enums.", "Silmoon.AI.OpenAI.Models.Enums.")
             .Replace("Silmoon.AI.Models.Anthropic.Models.", "Silmoon.AI.Anthropic.Models.");

@@ -5,7 +5,7 @@ using Silmoon.Extensions;
 
 namespace Silmoon.AI.OpenAI.Models;
 
-public interface IMessage
+public interface INativeMessage
 {
     [JsonProperty("hash")]
     string Hash { get; set; }
@@ -17,12 +17,12 @@ public interface IMessage
     string ToolCallId { get; set; }
     string GetContent();
 }
-public interface IMessage<TContent> : IMessage
+public interface INativeMessage<TContent> : INativeMessage
 {
     [JsonProperty("content")]
     TContent Content { get; set; }
 }
-public abstract class Message : IMessage
+public abstract class NativeMessage : INativeMessage
 {
     [JsonProperty("hash")]
     public string Hash { get; set; } = Guid.NewGuid().ToString("N");
@@ -38,7 +38,7 @@ public abstract class Message : IMessage
         return $"Role: {Role}, ToolCallId: {ToolCallId}, ToolCalls: {(ToolCalls != null ? string.Join(", ", ToolCalls) : "null")}";
     }
 }
-public abstract class Message<TContent> : Message, IMessage<TContent>
+public abstract class NativeMessage<TContent> : NativeMessage, INativeMessage<TContent>
 {
     [JsonProperty("content")]
     public TContent Content { get; set; }
@@ -48,14 +48,14 @@ public abstract class Message<TContent> : Message, IMessage<TContent>
     }
 }
 
-public class MessageContent : Message<string>
+public class NativeMessageContent : NativeMessage<string>
 {
     [JsonProperty("reasoning_content")]
     public string ReasoningContent { get; set; }
 
-    public static MessageContent Create(Role role, string content, string toolCallId, string reasoningContent = null)
+    public static NativeMessageContent Create(Role role, string content, string toolCallId, string reasoningContent = null)
     {
-        return new MessageContent
+        return new NativeMessageContent
         {
             Role = role,
             Content = content,
@@ -63,9 +63,9 @@ public class MessageContent : Message<string>
             ReasoningContent = reasoningContent,
         };
     }
-    public static MessageContent Create(Role role, string content, List<ToolCall> toolCalls = null, string reasoningContent = null)
+    public static NativeMessageContent Create(Role role, string content, List<ToolCall> toolCalls = null, string reasoningContent = null)
     {
-        return new MessageContent
+        return new NativeMessageContent
         {
             Role = role,
             Content = content,
@@ -75,20 +75,20 @@ public class MessageContent : Message<string>
     }
     public override string GetContent() => Content;
 }
-public class MessageJson : Message<JObject>
+public class NativeMessageJson : NativeMessage<JObject>
 {
-    public static MessageJson Create(Role role, JObject content, string toolCallId)
+    public static NativeMessageJson Create(Role role, JObject content, string toolCallId)
     {
-        return new MessageJson
+        return new NativeMessageJson
         {
             Role = role,
             Content = content,
             ToolCallId = toolCallId,
         };
     }
-    public static MessageJson Create(Role role, JObject content, List<ToolCall> toolCalls = null)
+    public static NativeMessageJson Create(Role role, JObject content, List<ToolCall> toolCalls = null)
     {
-        return new MessageJson
+        return new NativeMessageJson
         {
             Role = role,
             Content = content,
@@ -97,20 +97,20 @@ public class MessageJson : Message<JObject>
     }
     public override string GetContent() => Content.ToJsonString();
 }
-public class Messages<TContent> : Message<TContent[]>
+public class NativeMessages<TContent> : NativeMessage<TContent[]>
 {
-    public static Messages<TContent> Create(Role role, TContent[] content, string toolCallId)
+    public static NativeMessages<TContent> Create(Role role, TContent[] content, string toolCallId)
     {
-        return new Messages<TContent>
+        return new NativeMessages<TContent>
         {
             Role = role,
             Content = content,
             ToolCallId = toolCallId,
         };
     }
-    public static Messages<TContent> Create(Role role, TContent[] content, List<ToolCall> toolCalls = null)
+    public static NativeMessages<TContent> Create(Role role, TContent[] content, List<ToolCall> toolCalls = null)
     {
-        return new Messages<TContent>
+        return new NativeMessages<TContent>
         {
             Role = role,
             Content = content,
@@ -120,7 +120,7 @@ public class Messages<TContent> : Message<TContent[]>
     public override string GetContent() => Content != null ? string.Join("\r\n", Content.Select(x => x.ToString())) : string.Empty;
 }
 
-public class MessageImageUrl : Message
+public class NativeMessageImageUrl : NativeMessage
 {
     [JsonProperty("type")]
     public string Type { get; set; } = "image_url";
@@ -128,7 +128,7 @@ public class MessageImageUrl : Message
     public string ImageUrl { get; set; }
     public override string GetContent() => ImageUrl;
 }
-public class MessageText : Message
+public class NativeMessageText : NativeMessage
 {
     [JsonProperty("type")]
     public string Type { get; set; } = "text";

@@ -10,7 +10,7 @@ namespace Silmoon.AI.Anthropic;
 
 public static class AnthropicMessageAdapter
 {
-    public static AnthropicRequest CreateRequest(string model, IEnumerable<IMessage> history, string systemPrompt, IEnumerable<Tool> tools)
+    public static AnthropicRequest CreateRequest(string model, IEnumerable<INativeMessage> history, string systemPrompt, IEnumerable<Tool> tools)
     {
         List<AnthropicMessage> messages = [];
         foreach (var item in history ?? [])
@@ -29,7 +29,7 @@ public static class AnthropicMessageAdapter
         };
     }
 
-    static AnthropicMessage ConvertMessage(IMessage message)
+    static AnthropicMessage ConvertMessage(INativeMessage message)
     {
         if (message.Role == Role.Tool)
         {

@@ -30,24 +30,24 @@ public class ChatClient : INativeClient
     public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
 
     public bool EnableThinking { get; set; } = false;
-    public MessageCollection MessageHistory { get; set; } = [];
+    public NativeMessageCollection MessageHistory { get; set; } = [];
 
     public string SystemPrompt
     {
         set
         {
-            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System) as MessageContent;
+            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent;
             if (value is null)
             {
                 if (systemMessage is not null) MessageHistory.Remove(systemMessage);
             }
             else
             {
-                if (systemMessage is null) MessageHistory.Insert(0, MessageContent.Create(Role.System, value));
+                if (systemMessage is null) MessageHistory.Insert(0, NativeMessageContent.Create(Role.System, value));
                 else systemMessage.Content = value;
             }
         }
-        get => (MessageHistory.FirstOrDefault(m => m.Role == Role.System) as MessageContent)?.Content;
+        get => (MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent)?.Content;
     }
     public List<Tool> Tools { get; set; } = [];
 
@@ -87,19 +87,19 @@ public class ChatClient : INativeClient
     {
         var systemPrompt = SystemPrompt;
         MessageHistory.Clear();
-        if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, systemPrompt));
-        if (!continuation.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.User, continuation));
+        if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.System, systemPrompt));
+        if (!continuation.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.User, continuation));
     }
     public void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
 
     public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
-        await foreach (var chunk in CompletionsStreamAsync(MessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
+        await foreach (var chunk in CompletionsStreamAsync(NativeMessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
         {
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(IMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
@@ -107,7 +107,7 @@ public class ChatClient : INativeClient
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(MessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -160,12 +160,12 @@ public class ChatClient : INativeClient
                         result.FinishReason = "tool_calls";
                         goto callTools;
                     }
-                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, reasoningContent: result.ReasoningContent));
+                    messageHistory.Add(NativeMessageContent.Create(Role.Assistant, result.Content, reasoningContent: result.ReasoningContent));
                     break;
                 }
                 else if (result.FinishReason == "tool_calls")
                 {
-                    messageHistory.Add(MessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls], reasoningContent: result.ReasoningContent));
+                    messageHistory.Add(NativeMessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls], reasoningContent: result.ReasoningContent));
                     if (!result.ToolCalls.IsNullOrEmpty())
                     {
                         ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(result.ToolCalls);
@@ -179,7 +179,7 @@ public class ChatClient : INativeClient
                         {
                             foreach (var item in toolCallResults)
                             {
-                                messageHistory.Add(MessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
+                                messageHistory.Add(NativeMessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
                             }
                         }
                         continue;
@@ -193,13 +193,13 @@ public class ChatClient : INativeClient
         BusyResetEvent.Set();
     }
 
-    public async Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(MessageContent.Create(Role.User, content), tools, model, completionsUrl);
-    public async Task<ChatCompletionsResponse> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(NativeMessageContent.Create(Role.User, content), tools, model, completionsUrl);
+    public async Task<ChatCompletionsResponse> CompletionsAsync(INativeMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<ChatCompletionsResponse> CompletionsAsync(MessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<ChatCompletionsResponse> CompletionsAsync(NativeMessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -220,7 +220,7 @@ public class ChatClient : INativeClient
             callTools:
             if (firstChoice?.FinishReason == "tool_calls")
             {
-                messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
+                messageHistory.Add(NativeMessageContent.Create(Role.Assistant, firstChoice?.Message?.Content, [.. firstChoice?.Message?.ToolCalls]));
                 if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
                 {
                     ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(firstChoice?.Message?.ToolCalls);
@@ -234,7 +234,7 @@ public class ChatClient : INativeClient
                     {
                         foreach (var item in toolCallResults)
                         {
-                            messageHistory.Add(MessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
+                            messageHistory.Add(NativeMessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
                         }
                     }
                     continue;
@@ -247,7 +247,7 @@ public class ChatClient : INativeClient
                     firstChoice?.FinishReason = "tool_calls";
                     goto callTools;
                 }
-                messageHistory.Add(MessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
+                messageHistory.Add(NativeMessageContent.Create(Role.Assistant, firstChoice?.Message?.Content));
             }
 
             BusyResetEvent.Set();
