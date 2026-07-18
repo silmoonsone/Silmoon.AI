@@ -15,7 +15,7 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 | SSE 传输 | `SseHttpClient` 已从 Chat Completions 实现中抽出，可作为独立的 SSE HTTP 请求封装复用。 |
 | 工具调用 | 使用 `Tool` 声明函数 schema，通过 `ExecuteToolManager` 执行模型返回的 `tool_calls`，并自动把工具结果写回历史继续对话。 |
 | 内置工具 | `FileTool`、`CommandTool`、`WaitTool`、`WorldStateTool`、`MemoryTool` 等位于 `Silmoon.AI/Tools`。 |
-| 会话历史 | `ClearHistory(...)`、`RollbackHistory(...)` 用于清理或回滚消息历史，System Prompt 会按客户端规则保留。 |
+| 会话历史 | `MessageCollection` 用于保存交互消息，`ClearHistory(...)`、`RollbackHistory(...)` 用于清理或回滚历史，System Prompt 会按客户端规则保留。 |
 | 兼容旧历史 | `NativeApiJson` 内置反序列化兼容绑定，可读取旧命名空间里的历史 `$type`。以后旧历史淘汰后这部分可以移除。 |
 
 ## NativeApiKind
@@ -167,6 +167,30 @@ await foreach (var state in client.CompletionsStreamAsync("写一句短诗。", 
 }
 ```
 
+## 会话历史
+
+`INativeClient.MessageHistory` 使用 `MessageCollection` 保存交互消息。`MessageCollection` 继承自 `Collection<IMessage>`，支持索引读写，例如 `client.MessageHistory[0]`，JSON 序列化时仍保持和消息列表一致的数组结构。
+
+每条 `IMessage` 都有一个稳定的 `Hash`，用于在持久化历史后重新定位某条消息。普通 JSON 序列化会保留 `hash`，但发送给 Native API 的请求序列化会自动忽略该字段，避免污染 OpenAI-Compatible / Responses 请求体。
+
+`RollbackHistory(...)` 的一轮按“用户交互轮次”计算：从最近一条 User 消息开始，到后续所有 Assistant、Tool 以及多次连续工具调用结果，都视为同一轮并一起回滚。
+
+`MessageCollection` 提供了基础创建方法：
+
+```csharp
+var messages = MessageCollection.CreateOneUserMessage("你好");
+var messagesWithSystem = MessageCollection.CreateOneUserMessage("你好", "你是一个简洁的中文助手。");
+```
+
+后续如果需要统一处理 Add、Insert、Remove、Clear 或索引赋值行为，可以在 `MessageCollection` 中重写 `InsertItem(...)`、`SetItem(...)`、`RemoveItem(...)`、`ClearItems(...)`。
+
+按 Hash 截断某个 User 轮次可用于重试 API 响应：
+
+```csharp
+var userHash = client.MessageHistory.GetLastUserMessageHash();
+client.MessageHistory.TruncateFromUserMessageHash(userHash, keepUserMessage: true);
+```
+
 ## 工具调用示例
 
 ```csharp
@@ -210,7 +234,7 @@ Silmoon.AI/Anthropic/Models
 Silmoon.AI/Models
 ```
 
-`Silmoon.AI.Models` 放跨接口共享类型，例如 `ModelProvider`、`NativeApiKind`、`ToolCallParameter`、`ToolCallResult`、`Usage`。OpenAI Chat Completions 专属类型放在 `Silmoon.AI.OpenAI.Models` 下。
+`Silmoon.AI.Models` 放跨接口共享类型，例如 `ModelProvider`、`NativeApiKind`、`ToolCallParameter`、`ToolCallResult`、`Usage`。OpenAI 相关消息和结果模型放在 `Silmoon.AI.OpenAI.Models` 下，例如 `MessageCollection`、`MessageContent`、`ChatCompletionsResponse`。
 
 旧的 `Silmoon.AI.Models.OpenAI.Models.*` 类型名已迁移，`NativeApiJson` 目前保留历史兼容。
 

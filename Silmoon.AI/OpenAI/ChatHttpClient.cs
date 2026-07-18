@@ -9,6 +9,7 @@ namespace Silmoon.AI.OpenAI;
 public class ChatHttpClient : SseHttpClient
 {
     public static JsonSerializerSettings SerializerSettings => NativeApiJson.SerializerSettings;
+    public static JsonSerializerSettings RequestSerializerSettings => NativeApiJson.RequestSerializerSettings;
 
     public ChatHttpClient(int? requestTimeoutMilliseconds = null) : base(requestTimeoutMilliseconds) { }
     public ChatHttpClient(bool disableProxy, int? requestTimeoutMilliseconds = null) : base(disableProxy, requestTimeoutMilliseconds) { }
@@ -17,7 +18,7 @@ public class ChatHttpClient : SseHttpClient
     public async Task<StateSet<bool, ChatCompletionsResponse>> CompletionsAsync(string url, ChatCompletionsRequest request)
     {
         request.Stream = false;
-        var response = await PostJsonStringAsync(url, request.ToJsonRequestString(SerializerSettings));
+        var response = await PostJsonStringAsync(url, request.ToJsonRequestString(RequestSerializerSettings));
         if (!response.State) return false.ToStateSet<ChatCompletionsResponse>(null, response.Message);
 
         var responseData = JsonConvert.DeserializeObject<ChatCompletionsResponse>(response.Data, SerializerSettings);
@@ -28,7 +29,7 @@ public class ChatHttpClient : SseHttpClient
         request.Stream = true;
         List<ChatCompletionsChunk> chunks = [];
 
-        var response = await PostServerSentEventsAsync(url, request.ToJsonRequestString(SerializerSettings), async state =>
+        var response = await PostServerSentEventsAsync(url, request.ToJsonRequestString(RequestSerializerSettings), async state =>
         {
             if (!state.State)
             {

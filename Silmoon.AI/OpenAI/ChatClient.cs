@@ -30,7 +30,7 @@ public class ChatClient : INativeClient
     public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
 
     public bool EnableThinking { get; set; } = false;
-    public List<IMessage> MessageHistory { get; set; } = [];
+    public MessageCollection MessageHistory { get; set; } = [];
 
     public string SystemPrompt
     {
@@ -90,27 +90,7 @@ public class ChatClient : INativeClient
         if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.System, systemPrompt));
         if (!continuation.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.User, continuation));
     }
-    public void RollbackHistory(uint rounds = 1)
-    {
-        while (rounds > 0)
-        {
-            if (MessageHistory.IsNullOrEmpty()) break;
-            if (MessageHistory.LastOrDefault().Role == Role.System) break;
-
-            while (true)
-            {
-                if (MessageHistory.IsNullOrEmpty()) break;
-                if (MessageHistory.LastOrDefault().Role == Role.System) break;
-
-                MessageHistory.RemoveAt(MessageHistory.Count - 1);
-                if (MessageHistory.LastOrDefault().Role == Role.Assistant && MessageHistory.LastOrDefault().ToolCalls.IsNullOrEmpty())
-                {
-                    rounds--;
-                    break;
-                }
-            }
-        }
-    }
+    public void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
 
     public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
@@ -127,7 +107,7 @@ public class ChatClient : INativeClient
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(MessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -219,7 +199,7 @@ public class ChatClient : INativeClient
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<ChatCompletionsResponse> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public async Task<ChatCompletionsResponse> CompletionsAsync(MessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();

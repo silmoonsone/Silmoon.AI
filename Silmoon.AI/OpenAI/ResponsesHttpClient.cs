@@ -8,6 +8,7 @@ namespace Silmoon.AI.OpenAI;
 public class ResponsesHttpClient : SseHttpClient
 {
     public static JsonSerializerSettings SerializerSettings => NativeApiJson.SerializerSettings;
+    public static JsonSerializerSettings RequestSerializerSettings => NativeApiJson.RequestSerializerSettings;
 
     public ResponsesHttpClient(int? requestTimeoutMilliseconds = null) : base(requestTimeoutMilliseconds) { }
     public ResponsesHttpClient(bool disableProxy, int? requestTimeoutMilliseconds = null) : base(disableProxy, requestTimeoutMilliseconds) { }
@@ -16,7 +17,7 @@ public class ResponsesHttpClient : SseHttpClient
     public async Task<StateSet<bool, ResponsesResponse>> ResponsesAsync(string url, ResponsesRequest request)
     {
         request.Stream = false;
-        var response = await PostJsonStringAsync(url, request.ToJsonRequestString(SerializerSettings));
+        var response = await PostJsonStringAsync(url, request.ToJsonRequestString(RequestSerializerSettings));
         if (!response.State) return false.ToStateSet<ResponsesResponse>(null, response.Message);
 
         var responseData = JsonConvert.DeserializeObject<ResponsesResponse>(response.Data, SerializerSettings);
@@ -28,7 +29,7 @@ public class ResponsesHttpClient : SseHttpClient
         request.Stream = true;
         List<ResponsesStreamEvent> events = [];
 
-        var response = await PostServerSentEventsAsync(url, request.ToJsonRequestString(SerializerSettings), async state =>
+        var response = await PostServerSentEventsAsync(url, request.ToJsonRequestString(RequestSerializerSettings), async state =>
         {
             if (!state.State)
             {

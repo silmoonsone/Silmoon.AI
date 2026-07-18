@@ -27,7 +27,7 @@ public class ResponsesClient : INativeClient
     public ExecuteToolManager ExecuteToolManager { get; set; }
     public bool EnableThinking { get; set; } = false;
     public List<Tool> Tools { get; set; } = [];
-    public List<IMessage> MessageHistory { get; set; } = [];
+    public MessageCollection MessageHistory { get; set; } = [];
     public ManualResetEvent BusyResetEvent { get; private set; } = new(true);
     public AsyncLock BusyAsyncLock { get; private set; } = new();
 
@@ -92,27 +92,7 @@ public class ResponsesClient : INativeClient
         if (!continuation.IsNullOrEmpty()) MessageHistory.Add(MessageContent.Create(Role.User, continuation));
     }
 
-    public void RollbackHistory(uint rounds = 1)
-    {
-        while (rounds > 0)
-        {
-            if (MessageHistory.IsNullOrEmpty()) break;
-            if (MessageHistory.LastOrDefault().Role == Role.System) break;
-
-            while (true)
-            {
-                if (MessageHistory.IsNullOrEmpty()) break;
-                if (MessageHistory.LastOrDefault().Role == Role.System) break;
-
-                MessageHistory.RemoveAt(MessageHistory.Count - 1);
-                if (MessageHistory.LastOrDefault().Role == Role.Assistant && MessageHistory.LastOrDefault().ToolCalls.IsNullOrEmpty())
-                {
-                    rounds--;
-                    break;
-                }
-            }
-        }
-    }
+    public void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
 
     public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
     {
@@ -127,7 +107,7 @@ public class ResponsesClient : INativeClient
             yield return chunk;
     }
 
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
+    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(MessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -206,7 +186,7 @@ public class ResponsesClient : INativeClient
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
 
-    public async Task<ChatCompletionsResponse> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
+    public async Task<ChatCompletionsResponse> CompletionsAsync(MessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -242,7 +222,7 @@ public class ResponsesClient : INativeClient
         }
     }
 
-    ResponsesRequest CreateRequest(string model, List<IMessage> messageHistory, List<Tool> tools, bool stream)
+    ResponsesRequest CreateRequest(string model, MessageCollection messageHistory, List<Tool> tools, bool stream)
     {
         var request = new ResponsesRequest(model, CreateInput(messageHistory), SystemPrompt, stream);
         request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
@@ -316,7 +296,7 @@ public class ResponsesClient : INativeClient
         return result;
     }
 
-    void AddToolResults(List<IMessage> messageHistory, ToolCallParameter[] parameters, ToolCallResult[] toolCallResults)
+    void AddToolResults(MessageCollection messageHistory, ToolCallParameter[] parameters, ToolCallResult[] toolCallResults)
     {
         if (parameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
             return;

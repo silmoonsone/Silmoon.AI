@@ -20,7 +20,7 @@ public interface INativeClient : IDisposable
     string SystemPrompt { get; set; }
     bool EnableThinking { get; set; }
     List<Tool> Tools { get; set; }
-    List<IMessage> MessageHistory { get; set; }
+    MessageCollection MessageHistory { get; set; }
     ExecuteToolManager ExecuteToolManager { get; set; }
 
     /// <summary>
@@ -32,11 +32,11 @@ public interface INativeClient : IDisposable
     void RebuildHttpClient();
     IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
     IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(IMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
-    IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(List<IMessage> messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
+    IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(MessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
 
     Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
     Task<ChatCompletionsResponse> CompletionsAsync(IMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
-    Task<ChatCompletionsResponse> CompletionsAsync(List<IMessage> messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
+    Task<ChatCompletionsResponse> CompletionsAsync(MessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
 }
 
 

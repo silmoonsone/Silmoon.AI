@@ -7,6 +7,8 @@ namespace Silmoon.AI.OpenAI.Models;
 
 public interface IMessage
 {
+    [JsonProperty("hash")]
+    string Hash { get; set; }
     [JsonProperty("role")]
     Role Role { get; set; }
     [JsonProperty("tool_calls")]
@@ -22,6 +24,8 @@ public interface IMessage<TContent> : IMessage
 }
 public abstract class Message : IMessage
 {
+    [JsonProperty("hash")]
+    public string Hash { get; set; } = Guid.NewGuid().ToString("N");
     [JsonProperty("role")]
     public Role Role { get; set; }
     [JsonProperty("tool_calls")]

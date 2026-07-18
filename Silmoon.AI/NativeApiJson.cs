@@ -1,5 +1,7 @@
 ﻿using Newtonsoft.Json;
 using Newtonsoft.Json.Serialization;
+using Silmoon.AI.OpenAI.Models;
+using System.Reflection;
 
 namespace Silmoon.AI;
 
@@ -12,6 +14,26 @@ public static class NativeApiJson
         TypeNameHandling = TypeNameHandling.Auto,
         SerializationBinder = new NativeApiSerializationBinder(),
     };
+
+    public static JsonSerializerSettings RequestSerializerSettings { get; } = new()
+    {
+        NullValueHandling = NullValueHandling.Ignore,
+        MissingMemberHandling = MissingMemberHandling.Ignore,
+        TypeNameHandling = TypeNameHandling.Auto,
+        SerializationBinder = new NativeApiSerializationBinder(),
+        ContractResolver = new NativeApiRequestContractResolver(),
+    };
+}
+
+public class NativeApiRequestContractResolver : DefaultContractResolver
+{
+    protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
+    {
+        var property = base.CreateProperty(member, memberSerialization);
+        if (property.PropertyName == "hash" && property.DeclaringType is not null && typeof(IMessage).IsAssignableFrom(property.DeclaringType))
+            property.Ignored = true;
+        return property;
+    }
 }
 
 public class NativeApiSerializationBinder : ISerializationBinder
