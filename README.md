@@ -171,7 +171,7 @@ await foreach (var state in client.CompletionsStreamAsync("写一句短诗。", 
 
 `INativeClient.MessageHistory` 使用 `NativeMessageCollection` 保存交互消息。`NativeMessageCollection` 继承自 `Collection<INativeMessage>`，支持索引读写，例如 `client.MessageHistory[0]`，JSON 序列化时仍保持和消息列表一致的数组结构。
 
-每条 `INativeMessage` 都有一个稳定的 `Hash`，用于在持久化历史后重新定位某条消息。普通 JSON 序列化会保留 `hash`，但发送给 Native API 的请求序列化会自动忽略该字段，避免污染 OpenAI-Compatible / Responses 请求体。
+每条 `INativeMessage` 都有一个稳定的 `Id`，用于在持久化历史后重新定位某条消息。普通 JSON 序列化会保留 `id`，但发送给 Native API 的请求序列化会自动忽略该字段，避免污染 OpenAI-Compatible / Responses 请求体。
 
 `RollbackHistory(...)` 的一轮按“用户交互轮次”计算：从最近一条 User 消息开始，到后续所有 Assistant、Tool 以及多次连续工具调用结果，都视为同一轮并一起回滚。
 
@@ -184,11 +184,11 @@ var messagesWithSystem = NativeMessageCollection.CreateSingleNativeMessage("你�
 
 后续如果需要统一处理 Add、Insert、Remove、Clear 或索引赋值行为，可以在 `NativeMessageCollection` 中重写 `InsertItem(...)`、`SetItem(...)`、`RemoveItem(...)`、`ClearItems(...)`。
 
-按 Hash 截断某个 User 轮次可用于重试 API 响应：
+按 Id 截断某个 User 轮次可用于重试 API 响应：
 
 ```csharp
-var userHash = client.MessageHistory.GetLastUserMessageHash();
-client.MessageHistory.TruncateFromUserMessageHash(userHash, keepUserMessage: true);
+var userMessageId = client.MessageHistory.GetLastUserMessageId();
+client.MessageHistory.TruncateFromUserMessageId(userMessageId, keepUserMessage: true);
 ```
 
 ## 工具调用示例

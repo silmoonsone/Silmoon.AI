@@ -21,13 +21,13 @@ public class NativeMessageCollection : Collection<INativeMessage>
 
     protected override void InsertItem(int index, INativeMessage item)
     {
-        EnsureMessageHash(item);
+        EnsureMessageId(item);
         base.InsertItem(index, item);
     }
 
     protected override void SetItem(int index, INativeMessage item)
     {
-        EnsureMessageHash(item);
+        EnsureMessageId(item);
         base.SetItem(index, item);
     }
 
@@ -57,19 +57,19 @@ public class NativeMessageCollection : Collection<INativeMessage>
         {
             if (this[^1].Role == Role.System) break;
 
-            var userMessageHash = GetLastUserMessageHash();
-            if (string.IsNullOrEmpty(userMessageHash)) break;
+            var userMessageId = GetLastUserMessageId();
+            if (string.IsNullOrEmpty(userMessageId)) break;
 
-            if (!TruncateFromUserMessageHash(userMessageHash, keepUserMessage: false)) break;
+            if (!TruncateFromUserMessageId(userMessageId, keepUserMessage: false)) break;
             rollbackRounds++;
         }
 
         return rollbackRounds;
     }
 
-    public bool TruncateFromUserMessageHash(string userMessageHash, bool keepUserMessage = true)
+    public bool TruncateFromUserMessageId(string userMessageId, bool keepUserMessage = true)
     {
-        var userMessageIndex = GetUserMessageIndex(userMessageHash);
+        var userMessageIndex = GetUserMessageIndex(userMessageId);
         if (userMessageIndex < 0) return false;
 
         var startIndex = keepUserMessage ? userMessageIndex + 1 : userMessageIndex;
@@ -78,10 +78,10 @@ public class NativeMessageCollection : Collection<INativeMessage>
         return true;
     }
 
-    public string GetLastUserMessageHash()
+    public string GetLastUserMessageId()
     {
         var index = GetLastUserMessageIndex();
-        return index < 0 ? null : this[index].Hash;
+        return index < 0 ? null : this[index].Id;
     }
 
     public int GetLastUserMessageIndex()
@@ -94,20 +94,20 @@ public class NativeMessageCollection : Collection<INativeMessage>
         return -1;
     }
 
-    public int GetUserMessageIndex(string userMessageHash)
+    public int GetUserMessageIndex(string userMessageId)
     {
-        if (string.IsNullOrEmpty(userMessageHash)) return -1;
+        if (string.IsNullOrEmpty(userMessageId)) return -1;
         for (var i = 0; i < Count; i++)
         {
-            if (this[i].Role == Role.User && this[i].Hash == userMessageHash)
+            if (this[i].Role == Role.User && this[i].Id == userMessageId)
                 return i;
         }
         return -1;
     }
 
-    static void EnsureMessageHash(INativeMessage item)
+    static void EnsureMessageId(INativeMessage item)
     {
-        if (item is not null && string.IsNullOrEmpty(item.Hash))
-            item.Hash = Guid.NewGuid().ToString("N");
+        if (item is not null && string.IsNullOrEmpty(item.Id))
+            item.Id = Guid.NewGuid().ToString("N");
     }
 }

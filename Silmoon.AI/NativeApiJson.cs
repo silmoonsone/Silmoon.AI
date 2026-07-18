@@ -30,7 +30,7 @@ public class NativeApiRequestContractResolver : DefaultContractResolver
     protected override JsonProperty CreateProperty(MemberInfo member, MemberSerialization memberSerialization)
     {
         var property = base.CreateProperty(member, memberSerialization);
-        if (property.PropertyName == "hash" && property.DeclaringType is not null && typeof(INativeMessage).IsAssignableFrom(property.DeclaringType))
+        if (property.PropertyName is "id" && property.DeclaringType is not null && typeof(INativeMessage).IsAssignableFrom(property.DeclaringType))
             property.Ignored = true;
         return property;
     }

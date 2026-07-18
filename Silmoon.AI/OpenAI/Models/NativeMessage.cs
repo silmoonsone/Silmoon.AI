@@ -7,8 +7,8 @@ namespace Silmoon.AI.OpenAI.Models;
 
 public interface INativeMessage
 {
-    [JsonProperty("hash")]
-    string Hash { get; set; }
+    [JsonProperty("id")]
+    string Id { get; set; }
     [JsonProperty("role")]
     Role Role { get; set; }
     [JsonProperty("tool_calls")]
@@ -24,8 +24,8 @@ public interface INativeMessage<TContent> : INativeMessage
 }
 public abstract class NativeMessage : INativeMessage
 {
-    [JsonProperty("hash")]
-    public string Hash { get; set; } = Guid.NewGuid().ToString("N");
+    [JsonProperty("id")]
+    public string Id { get; set; } = Guid.NewGuid().ToString("N");
     [JsonProperty("role")]
     public Role Role { get; set; }
     [JsonProperty("tool_calls")]
