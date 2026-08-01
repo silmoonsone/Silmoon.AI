@@ -8,6 +8,7 @@ Migrations/
 .idea/
 .DS_Store
 *local*.json
+*local*.md
 *.local.cs
 *.local.db
 *.local-log.db

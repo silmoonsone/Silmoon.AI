@@ -20,15 +20,15 @@ public class SilmoonConfigureServiceImpl : SilmoonConfigureService
 
         Provider = new ModelProvider
         {
-            ProviderName = ConfigJson["providerName"]?.Value<string>() ?? "deepseek",
-            ApiUrl = ConfigJson["apiUrl"]?.Value<string>() ?? "https://api.deepseek.com/anthropic",
-            ApiKey = ConfigJson["apiKey"]?.Value<string>() ?? string.Empty,
+            ProviderName = ConfigJson["providerName"]?.Value<string>(),
+            ApiUrl = ConfigJson["apiUrl"]?.Value<string>(),
+            ApiKey = ConfigJson["apiKey"]?.Value<string>(),
             ApiKind = NativeApiKind.Authropic,
-            AnthropicVersion = ConfigJson["anthropicVersion"]?.Value<string>() ?? "2023-06-01",
+            AnthropicVersion = ConfigJson["anthropicVersion"]?.Value<string>(),
         };
-        ModelName = ConfigJson["modelName"]?.Value<string>() ?? "deepseek-v4-flash";
+        ModelName = ConfigJson["modelName"]?.Value<string>();
         Provider.Models.Add(new Model { Name = ModelName, Enable = true });
-        SystemPrompt = ConfigJson["systemPrompt"]?.Value<string>() ?? "You are a concise Anthropic Messages API test assistant.";
+        SystemPrompt = ConfigJson["systemPrompt"]?.Value<string>();
 
         logger.LogInformation($"Anthropic test provider: {Provider.ProviderName}, model: {ModelName}, ApiUrl: {Provider.ApiUrl}, KeyConfigured: {!Provider.ApiKey.IsNullOrEmpty()}");
     }
