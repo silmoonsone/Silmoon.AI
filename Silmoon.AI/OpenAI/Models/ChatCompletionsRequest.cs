@@ -1,28 +1,17 @@
 ﻿using System;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
+using Silmoon.AI.Models;
 using Silmoon.Extensions;
 
 namespace Silmoon.AI.OpenAI.Models;
 
-public class ChatCompletionsRequest
+public class ChatCompletionsRequest : RequestBase
 {
-    [JsonProperty("model")]
-    public string Model { get; set; }
     [JsonProperty("messages")]
     public INativeMessage[] Messages { get; set; }
-    [JsonProperty("stream")]
-    public bool? Stream { get; set; }
-    [JsonProperty("temperature")]
-    public double? Temperature { get; set; }
-    [JsonProperty("top_p")]
-    public double? TopP { get; set; }
-    [JsonProperty("top_k")]
-    public int? TopK { get; set; }
     [JsonProperty("tools", NullValueHandling = NullValueHandling.Ignore)]
     public List<Tool> Tools { get; set; }
-    [JsonIgnore]
-    public JObject ExtraBody { get; set; } = new JObject();
     public bool ShouldSerializeTools() => Tools != null && Tools.Count > 0;
     public ChatCompletionsRequest(string model, INativeMessage[] messages, bool stream = true)
     {
@@ -60,25 +49,6 @@ public class ChatCompletionsRequest
         //    }
         //    else ExtraBody["thinking"] = JObject.FromObject(new { type = "disabled" });
         //}
-    }
-    public string ToJsonRequestString(JsonSerializerSettings settings = null)
-    {
-        settings ??= new JsonSerializerSettings()
-        {
-            NullValueHandling = NullValueHandling.Ignore,
-            MissingMemberHandling = MissingMemberHandling.Ignore,
-            TypeNameHandling = TypeNameHandling.Auto,
-        };
-        var jsonObject = JObject.FromObject(this, JsonSerializer.Create(settings));
-        if (ExtraBody != null && ExtraBody.Count > 0)
-        {
-            jsonObject.Merge(ExtraBody, new JsonMergeSettings
-            {
-                MergeNullValueHandling = settings.NullValueHandling == NullValueHandling.Ignore ? MergeNullValueHandling.Ignore : MergeNullValueHandling.Merge,
-                MergeArrayHandling = MergeArrayHandling.Union
-            });
-        }
-        return jsonObject.ToJsonString(settings);
     }
 }
 

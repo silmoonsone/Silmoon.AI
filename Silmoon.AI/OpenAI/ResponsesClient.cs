@@ -26,6 +26,8 @@ public class ResponsesClient : INativeClient
     public string ModelName { get; set; }
     public ExecuteToolManager ExecuteToolManager { get; set; }
     public bool EnableThinking { get; set; } = false;
+    public double? Temperature { get; set; } = RequestBase.DefaultTemperature;
+    public double? TopP { get; set; } = RequestBase.DefaultTopP;
     public List<Tool> Tools { get; set; } = [];
     public NativeMessageCollection MessageHistory { get; set; } = [];
     public ManualResetEvent BusyResetEvent { get; private set; } = new(true);
@@ -51,12 +53,14 @@ public class ResponsesClient : INativeClient
         }
     }
 
-    public ResponsesClient(ModelProvider modelProvider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public ResponsesClient(ModelProvider modelProvider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
     {
         ModelProvider = modelProvider;
         ModelName = modelName;
         SystemPrompt = systemPrompt;
         EnableThinking = enableThinking;
+        Temperature = temperature ?? RequestBase.DefaultTemperature;
+        TopP = topP ?? RequestBase.DefaultTopP;
         ExecuteToolManager = new ExecuteToolManager(this);
         ExecuteToolManager.OnToolCallsStart += async p => await (OnToolCallsStart?.Invoke(p) ?? Task.CompletedTask);
         ExecuteToolManager.OnToolCallInvoke += async (p, r) => OnToolCallInvoke is null ? r : await OnToolCallInvoke.Invoke(p, r);
@@ -65,8 +69,8 @@ public class ResponsesClient : INativeClient
         ExecuteToolManager.OnToolExecuted += async (name, p, r) => await (OnToolExecuted?.Invoke(name, p, r) ?? Task.CompletedTask);
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public ResponsesClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
-        : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
+    public ResponsesClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
+        : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds, temperature, topP)
     {
     }
 
@@ -225,6 +229,8 @@ public class ResponsesClient : INativeClient
     ResponsesRequest CreateRequest(string model, NativeMessageCollection messageHistory, List<Tool> tools, bool stream)
     {
         var request = new ResponsesRequest(model, CreateInput(messageHistory), SystemPrompt, stream);
+        request.Temperature = Temperature;
+        request.TopP = TopP;
         request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
         request.Tools = CreateTools(tools);
         return request;

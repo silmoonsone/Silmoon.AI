@@ -29,6 +29,8 @@ public class AnthropicClient : INativeClient
     public List<Tool> Tools { get; set; } = [];
     public NativeMessageCollection MessageHistory { get; set; } = [];
     public bool EnableThinking { get; set; } = false;
+    public double? Temperature { get; set; } = RequestBase.DefaultTemperature;
+    public double? TopP { get; set; } = RequestBase.DefaultTopP;
     public ManualResetEvent BusyResetEvent { get; private set; } = new(true);
     public AsyncLock BusyAsyncLock { get; private set; } = new();
 
@@ -52,11 +54,13 @@ public class AnthropicClient : INativeClient
         }
     }
 
-    public AnthropicClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public AnthropicClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
     {
         ModelProvider = provider;
         ModelName = modelName;
         SystemPrompt = systemPrompt;
+        Temperature = temperature ?? RequestBase.DefaultTemperature;
+        TopP = topP ?? RequestBase.DefaultTopP;
         ExecuteToolManager = new ExecuteToolManager(this);
         ExecuteToolManager.OnToolCallsStart += async p => await (OnToolCallsStart?.Invoke(p) ?? Task.CompletedTask);
         ExecuteToolManager.OnToolCallInvoke += async (p, r) => OnToolCallInvoke is null ? r : await OnToolCallInvoke.Invoke(p, r);
@@ -65,8 +69,8 @@ public class AnthropicClient : INativeClient
         ExecuteToolManager.OnToolExecuted += async (name, p, r) => await (OnToolExecuted?.Invoke(name, p, r) ?? Task.CompletedTask);
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public AnthropicClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
-        : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds)
+    public AnthropicClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
+        : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds, temperature, topP)
     {
     }
 
@@ -116,6 +120,8 @@ public class AnthropicClient : INativeClient
             while (true)
             {
                 var request = AnthropicMessageAdapter.CreateRequest(model, messageHistory, SystemPrompt, tools ?? Tools);
+                request.Temperature = Temperature;
+                request.TopP = TopP;
                 Channel<StateSet<bool, ChatCompletionsChunk>> channel = Channel.CreateUnbounded<StateSet<bool, ChatCompletionsChunk>>();
                 List<AnthropicStreamEvent> streamEvents = [];
                 var callbackTask = HttpClient.MessagesStreamAsync(BuildUrl(completionsUrl), request, async state =>
@@ -190,6 +196,8 @@ public class AnthropicClient : INativeClient
             while (true)
             {
                 var request = AnthropicMessageAdapter.CreateRequest(model, messageHistory, SystemPrompt, tools ?? Tools);
+                request.Temperature = Temperature;
+                request.TopP = TopP;
                 var responseState = await HttpClient.MessagesAsync(BuildUrl(completionsUrl), request);
                 if (!responseState.State)
                     return new ChatCompletionsResponse { Choices = [new ChatCompletionsChoice { FinishReason = "error", Message = NativeMessageContent.Create(Role.Assistant, responseState.Message) }], Model = model };

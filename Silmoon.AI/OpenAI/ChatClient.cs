@@ -30,6 +30,8 @@ public class ChatClient : INativeClient
     public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
 
     public bool EnableThinking { get; set; } = false;
+    public double? Temperature { get; set; } = RequestBase.DefaultTemperature;
+    public double? TopP { get; set; } = RequestBase.DefaultTopP;
     public NativeMessageCollection MessageHistory { get; set; } = [];
 
     public string SystemPrompt
@@ -51,12 +53,14 @@ public class ChatClient : INativeClient
     }
     public List<Tool> Tools { get; set; } = [];
 
-    public ChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null)
+    public ChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
     {
         ModelProvider = provider;
         ModelName = modelName;
         SystemPrompt = systemPrompt;
         EnableThinking = enableThinking;
+        Temperature = temperature ?? RequestBase.DefaultTemperature;
+        TopP = topP ?? RequestBase.DefaultTopP;
 
         ExecuteToolManager = new ExecuteToolManager(this);
 
@@ -68,7 +72,7 @@ public class ChatClient : INativeClient
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public ChatClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds)
+    public ChatClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds, temperature, topP)
     {
     }
 
@@ -116,6 +120,8 @@ public class ChatClient : INativeClient
         while (true)
         {
             var request = new ChatCompletionsRequest(model, [.. messageHistory]);
+            request.Temperature = Temperature;
+            request.TopP = TopP;
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.Tools = tools ?? Tools;
 
@@ -207,6 +213,8 @@ public class ChatClient : INativeClient
         while (true)
         {
             var request = new ChatCompletionsRequest(model, [.. messageHistory]);
+            request.Temperature = Temperature;
+            request.TopP = TopP;
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
             request.Tools = tools ?? Tools;
 

@@ -19,6 +19,8 @@ public interface INativeClient : IDisposable
     string ModelName { get; set; }
     string SystemPrompt { get; set; }
     bool EnableThinking { get; set; }
+    double? Temperature { get; set; }
+    double? TopP { get; set; }
     List<Tool> Tools { get; set; }
     NativeMessageCollection MessageHistory { get; set; }
     ExecuteToolManager ExecuteToolManager { get; set; }
