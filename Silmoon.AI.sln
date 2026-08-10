@@ -22,7 +22,7 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.WinFormTest", "S
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.Terminal", "Silmoon.AI.Terminal\Silmoon.AI.Terminal.csproj", "{210D0239-B62A-4E73-A925-E1A85A1A70F0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.AuthropicClientTest", "Silmoon.AI.AuthropicClientTest\Silmoon.AI.AuthropicClientTest.csproj", "{50EB0EC2-75FC-4453-91AB-3CA5BA148768}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.AnthropicClientTest", "Silmoon.AI.AnthropicClientTest\Silmoon.AI.AnthropicClientTest.csproj", "{50EB0EC2-75FC-4453-91AB-3CA5BA148768}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Silmoon.AI.ChatClientTest", "Silmoon.AI.ChatClientTest\Silmoon.AI.ChatClientTest.csproj", "{6C664803-5F09-4E06-9908-62BE23F94986}"
 EndProject

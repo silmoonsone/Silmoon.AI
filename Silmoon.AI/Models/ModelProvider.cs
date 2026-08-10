@@ -31,7 +31,7 @@ namespace Silmoon.AI.Models
                 ApiUrl = apiUrl,
                 ApiKey = apiKey,
                 ProviderName = providerName,
-                Models = [new Model { Name = modelName }]
+                Models = [Model.Create(modelName)]
             };
         }
     }
@@ -43,7 +43,11 @@ namespace Silmoon.AI.Models
 
         [JsonProperty("enable")]
         public bool Enable { get; set; } = true;
+        public static Model Create(string name, bool enable = true) => new Model
+        {
+            Name = name,
+            Enable = enable
+        };
     }
-
 }
 

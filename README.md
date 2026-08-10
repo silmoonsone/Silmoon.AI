@@ -26,7 +26,7 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 |----|--------|------|
 | `Chat` | `ChatClient` | 当前主力实现，适配 OpenAI-Compatible 厂商。 |
 | `Responses` | `ResponsesClient` | 代码实现已完成，适配 OpenAI Responses API；当前尚未完成真实接口联调验证。 |
-| `Authropic` | `AnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
+| `Anthropic` | `AnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
 
 统一创建方式：
 
@@ -40,7 +40,7 @@ var provider = new ModelProvider
     ProviderName = "deepseek",
     ApiUrl = "https://api.example.com",
     ApiKey = "sk-***",
-    ApiKind = NativeApiKind.Authropic,
+    ApiKind = NativeApiKind.Anthropic,
     AnthropicVersion = "2023-06-01",
     Models = [new Model { Name = "deepseek-chat" }]
 };
@@ -64,7 +64,7 @@ Silmoon.AI/                         核心类库
 
 Silmoon.AI.HostingTest/             统一 INativeClient 调用示例
 Silmoon.AI.ChatClientTest/          OpenAI Chat Completions 原生客户端测试
-Silmoon.AI.AuthropicClientTest/     Anthropic Messages 原生客户端测试
+Silmoon.AI.AnthropicClientTest/     Anthropic Messages 原生客户端测试
 Silmoon.AI.ResponsesClientTest/     OpenAI Responses 原生客户端测试占位项目
 Silmoon.AI.Terminal/                终端示例
 Silmoon.AI.WinFormTest/             WinForms 示例
@@ -81,7 +81,7 @@ Silmoon.AI.WinFormTest/             WinForms 示例
   "apiUrl": "https://api.example.com",
   "apiKey": "sk-***",
   "providerName": "deepseek",
-  "apiKind": "Authropic",
+  "apiKind": "Anthropic",
   "modelName": "deepseek-chat",
   "anthropicVersion": "2023-06-01"
 }
@@ -107,7 +107,7 @@ OpenAI-Compatible Chat Completions 示例：
 dotnet restore
 dotnet run --project ./Silmoon.AI.HostingTest/Silmoon.AI.HostingTest.csproj
 dotnet run --project ./Silmoon.AI.ChatClientTest/Silmoon.AI.ChatClientTest.csproj
-dotnet run --project ./Silmoon.AI.AuthropicClientTest/Silmoon.AI.AuthropicClientTest.csproj
+dotnet run --project ./Silmoon.AI.AnthropicClientTest/Silmoon.AI.AnthropicClientTest.csproj
 dotnet run --project ./Silmoon.AI.ResponsesClientTest/Silmoon.AI.ResponsesClientTest.csproj
 ```
 

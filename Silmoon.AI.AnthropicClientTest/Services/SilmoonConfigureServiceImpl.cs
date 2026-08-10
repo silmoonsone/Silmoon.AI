@@ -6,7 +6,7 @@ using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using Silmoon.Extensions.Hosting.Services;
 
-namespace Silmoon.AI.AuthropicClientTest.Services;
+namespace Silmoon.AI.AnthropicClientTest.Services;
 
 public class SilmoonConfigureServiceImpl : SilmoonConfigureService
 {
@@ -23,7 +23,7 @@ public class SilmoonConfigureServiceImpl : SilmoonConfigureService
             ProviderName = ConfigJson["providerName"]?.Value<string>(),
             ApiUrl = ConfigJson["apiUrl"]?.Value<string>(),
             ApiKey = ConfigJson["apiKey"]?.Value<string>(),
-            ApiKind = NativeApiKind.Authropic,
+            ApiKind = NativeApiKind.Anthropic,
             AnthropicVersion = ConfigJson["anthropicVersion"]?.Value<string>(),
         };
         ModelName = ConfigJson["modelName"]?.Value<string>();

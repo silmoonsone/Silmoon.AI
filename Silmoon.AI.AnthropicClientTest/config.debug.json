@@ -2,7 +2,7 @@
   "apiUrl": "https://api.deepseek.com/anthropic",
   "apiKey": "sk-***",
   "providerName": "deepseek",
-  "apiKind": "Authropic",
+  "apiKind": "Anthropic",
   "modelName": "deepseek-v4-flash",
   "anthropicVersion": "2023-06-01"
 }

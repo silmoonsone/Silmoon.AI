@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
-using Silmoon.AI.AuthropicClientTest.Services;
+using Silmoon.AI.AnthropicClientTest.Services;
 using Silmoon.Extensions.Hosting.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 
