@@ -13,7 +13,7 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 | Anthropic Messages | `AnthropicClient` 支持 Anthropic Messages 风格接口，并把返回结果适配为库内通用的 Chat Completions 结果模型。 |
 | OpenAI Responses | `ResponsesClient` 已补齐 OpenAI Responses API 的普通请求、SSE 流式、工具调用和统一结果模型适配，已通过 DeepSeek Responses 冒烟验证。 |
 | SSE 传输 | `SseHttpClient` 已从 Chat Completions 实现中抽出，可作为独立的 SSE HTTP 请求封装复用。 |
-| 工具调用 | 使用 `Tool` 声明函数 schema，通过 `ExecuteToolManager` 执行模型返回的 `tool_calls`，并自动把工具结果写回历史继续对话。 |
+| 工具调用 | 使用 `Tool` 声明函数 schema，通过 `ToolSet` 组织一组可执行工具，并由 `ToolSetManager` 执行模型返回的 `tool_calls`。 |
 | 内置工具 | `FileTool`、`CommandTool`、`WaitTool`、`WorldStateTool`、`MemoryTool` 等位于 `Silmoon.AI/Tools`。 |
 | 会话历史 | `NativeMessageCollection` 用于保存交互消息，`ClearHistory(...)`、`RollbackHistory(...)` 用于清理或回滚历史，System Prompt 会按客户端规则保留。 |
 | 兼容旧历史 | `NativeApiJson` 内置反序列化兼容绑定，可读取旧命名空间里的历史 `$type`。以后旧历史淘汰后这部分可以移除。 |
@@ -215,17 +215,17 @@ client.OnToolCallInvoke += (parameter, currentResult) =>
 };
 ```
 
-内置工具可直接注入：
+内置工具可通过 `ToolSet` 注册：
 
 ```csharp
-client.AddExecuteTools([
+client.AddToolSets([
     new WaitTool(),
     new WorldStateTool(),
     new MemoryTool(client)
 ]);
 ```
 
-`AddExecuteTool(...)` / `AddExecuteTools(...)` 会通过 `ExecuteToolManager` 完成工具 schema 注册和调用事件注入，并按 function name 检查重复工具。
+`AddToolSet(...)` / `AddToolSets(...)` 会通过 `ToolSetManager` 完成工具 schema 注册和调用事件注入，并按 function name 检查重复工具。
 
 `FileTool` 和 `CommandTool` 能访问文件系统或执行命令，实际产品中应按宿主环境做好权限边界。
 

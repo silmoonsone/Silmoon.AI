@@ -13,7 +13,7 @@ namespace Silmoon.AI.Tools;
 /// <summary>
 /// 供模型显式等待一段时间（节流轮询、部署/重启后就绪检测等），不执行 shell。
 /// </summary>
-public class WaitTool : ExecuteTool
+public class WaitTool : ToolSet
 {
     public const string WaitFunctionName = "Wait_Delay";
 

@@ -26,13 +26,13 @@ public class AnthropicClient : NativeClient
         Temperature = temperature ?? RequestBase.DefaultTemperature;
         TopP = topP ?? RequestBase.DefaultTopP;
 
-        ExecuteToolManager = new ExecuteToolManager(this);
+        ToolSetManager = new ToolSetManager(this);
 
-        ExecuteToolManager.OnToolCallsStart += onToolCallsStart;
-        ExecuteToolManager.OnToolCallInvoke += onToolCallInvoke;
-        ExecuteToolManager.OnToolCallsFinish += onToolCallsFinish;
-        ExecuteToolManager.OnToolExecuting += onToolCallExecuting;
-        ExecuteToolManager.OnToolExecuted += onToolCallExecuted;
+        ToolSetManager.OnToolCallsStart += onToolCallsStart;
+        ToolSetManager.OnToolCallInvoke += onToolCallInvoke;
+        ToolSetManager.OnToolCallsFinish += onToolCallsFinish;
+        ToolSetManager.OnToolExecuting += onToolCallExecuting;
+        ToolSetManager.OnToolExecuted += onToolCallExecuted;
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
@@ -123,7 +123,7 @@ public class AnthropicClient : NativeClient
                 {
                     messageHistory.Add(NativeMessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
                     var parameters = ToolCallParameter.Create(result.ToolCalls);
-                    var toolCallResults = await ExecuteToolManager.ToolCalls(parameters);
+                    var toolCallResults = await ToolSetManager.ToolCalls(parameters);
                     if (parameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                     {
                     }
@@ -173,7 +173,7 @@ public class AnthropicClient : NativeClient
                 {
                     messageHistory.Add(NativeMessageContent.Create(Role.Assistant, firstChoice.Message.Content, [.. firstChoice.Message.ToolCalls]));
                     var parameters = ToolCallParameter.Create(firstChoice.Message.ToolCalls);
-                    var toolCallResults = await ExecuteToolManager.ToolCalls(parameters);
+                    var toolCallResults = await ToolSetManager.ToolCalls(parameters);
                     foreach (var item in toolCallResults)
                         messageHistory.Add(NativeMessageContent.Create(Role.Tool, item.Result.ToJsonString(), item.Parameter.ToolCallId));
                     continue;

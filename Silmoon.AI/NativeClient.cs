@@ -22,7 +22,7 @@ namespace Silmoon.AI
         public ModelProvider ModelProvider { get; set; }
         public string ModelName { get; set; }
 
-        public ExecuteToolManager ExecuteToolManager { get; set; }
+        public ToolSetManager ToolSetManager { get; set; }
 
         public bool EnableThinking { get; set; } = false;
         public double? Temperature { get; set; } = RequestBase.DefaultTemperature;
@@ -53,8 +53,8 @@ namespace Silmoon.AI
         public abstract void ClearHistory(string? continuation = null);
         public abstract void RollbackHistory(uint rounds = 1);
         public abstract void RebuildHttpClient();
-        public virtual StateSet<bool> AddExecuteTool(IExecuteTool executeTool) => ExecuteToolManager.AddExecuteTool(executeTool);
-        public virtual void AddExecuteTools(IExecuteTool[] executeTools) => ExecuteToolManager.AddExecuteTools(executeTools);
+        public virtual StateSet<bool> AddToolSet(IToolSet toolSet) => ToolSetManager.AddToolSet(toolSet);
+        public virtual void AddToolSets(IToolSet[] toolSets) => ToolSetManager.AddToolSets(toolSets);
 
         public abstract IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
         public abstract IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");

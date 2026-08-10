@@ -8,7 +8,7 @@ using System.Runtime.InteropServices;
 
 namespace Silmoon.AI.Tools
 {
-    public class WorldStateTool : ExecuteTool
+    public class WorldStateTool : ToolSet
     {
         public const string WorldStateFunctionName = "Sys_WorldState";
 

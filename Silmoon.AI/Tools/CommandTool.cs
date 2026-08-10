@@ -13,7 +13,7 @@ using System.Threading;
 
 namespace Silmoon.AI.Tools
 {
-    public class CommandTool : ExecuteTool
+    public class CommandTool : ToolSet
     {
         public const string CommandFunctionName = "Command_Run";
         public const string StatefulExecuteFunctionName = "Command_StatefulExecute";

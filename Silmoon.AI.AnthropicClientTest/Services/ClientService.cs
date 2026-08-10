@@ -31,7 +31,7 @@ public class ClientService : BackgroundService
         NativeClient.Tools.Add(Tool.Create("Test_GetSecretCode", "Return a fixed test code. Use this when the user asks to test tool calling.", []));
         NativeClient.OnToolCallInvoke += Client_OnToolCallInvoke;
 
-        NativeClient.AddExecuteTools([new FileTool(), new CommandTool(), new WaitTool(), new WorldStateTool()]);
+        NativeClient.AddToolSets([new FileTool(), new CommandTool(), new WaitTool(), new WorldStateTool()]);
     }
 
     Task Client_OnToolCallsStart(ToolCallParameter[] toolCallParameters)

@@ -12,7 +12,7 @@ using System.Text;
 
 namespace Silmoon.AI.Tools
 {
-    public class DeepThinkTool : ExecuteTool
+    public class DeepThinkTool : ToolSet
     {
         public const string CallAgentFunctionName = "DeepThink_Call";
 

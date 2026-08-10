@@ -10,7 +10,7 @@ using System.Text;
 
 namespace Silmoon.AI.Interfaces
 {
-    public interface IExecuteTool
+    public interface IToolSet
     {
         Tool[] Tools { get; }
         Tool[] GetTools();

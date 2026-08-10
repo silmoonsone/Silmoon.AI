@@ -23,7 +23,7 @@ public interface INativeClient : IDisposable
     double? TopP { get; set; }
     List<Tool> Tools { get; set; }
     NativeMessageCollection MessageHistory { get; set; }
-    ExecuteToolManager ExecuteToolManager { get; set; }
+    ToolSetManager ToolSetManager { get; set; }
 
     /// <summary>
     /// 重置消息历史：无续接正文时仅保留当前 <see cref="SystemPrompt"/> 对应的一条 System（若无 System 则整表清空）；有正文时再追加一条 User。
@@ -33,8 +33,8 @@ public interface INativeClient : IDisposable
     void RollbackHistory(uint rounds = 1);
     void RebuildHttpClient();
 
-    StateSet<bool> AddExecuteTool(IExecuteTool executeTool);
-    void AddExecuteTools(IExecuteTool[] executeTools);
+    StateSet<bool> AddToolSet(IToolSet toolSet);
+    void AddToolSets(IToolSet[] toolSets);
 
     IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
     IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");

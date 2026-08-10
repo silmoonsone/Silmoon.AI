@@ -26,13 +26,13 @@ public class ChatClient : NativeClient
         Temperature = temperature ?? RequestBase.DefaultTemperature;
         TopP = topP ?? RequestBase.DefaultTopP;
 
-        ExecuteToolManager = new ExecuteToolManager(this);
+        ToolSetManager = new ToolSetManager(this);
 
-        ExecuteToolManager.OnToolCallsStart += onToolCallsStart;
-        ExecuteToolManager.OnToolCallInvoke += onToolCallInvoke;
-        ExecuteToolManager.OnToolCallsFinish += onToolCallsFinish;
-        ExecuteToolManager.OnToolExecuting += onToolCallExecuting;
-        ExecuteToolManager.OnToolExecuted += onToolCallExecuted;
+        ToolSetManager.OnToolCallsStart += onToolCallsStart;
+        ToolSetManager.OnToolCallInvoke += onToolCallInvoke;
+        ToolSetManager.OnToolCallsFinish += onToolCallsFinish;
+        ToolSetManager.OnToolExecuting += onToolCallExecuting;
+        ToolSetManager.OnToolExecuted += onToolCallExecuted;
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
@@ -141,7 +141,7 @@ public class ChatClient : NativeClient
                     if (!result.ToolCalls.IsNullOrEmpty())
                     {
                         ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(result.ToolCalls);
-                        var toolCallResults = await ExecuteToolManager.ToolCalls(toolCallParameters);
+                        var toolCallResults = await ToolSetManager.ToolCalls(toolCallParameters);
 
                         if (toolCallParameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                         {
@@ -198,7 +198,7 @@ public class ChatClient : NativeClient
                 if (!firstChoice?.Message?.ToolCalls.IsNullOrEmpty() ?? false)
                 {
                     ToolCallParameter[] toolCallParameters = ToolCallParameter.Create(firstChoice?.Message?.ToolCalls);
-                    var toolCallResults = await ExecuteToolManager.ToolCalls(toolCallParameters);
+                    var toolCallResults = await ToolSetManager.ToolCalls(toolCallParameters);
 
                     if (toolCallParameters.Any(x => x.FunctionName == MemoryTool.ApplyMemoryToolFunctionName) && toolCallResults.Any(x => x.Result.State && x.Parameter.FunctionName == MemoryTool.ApplyMemoryToolFunctionName))
                     {

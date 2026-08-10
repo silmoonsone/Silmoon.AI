@@ -11,7 +11,7 @@ namespace Silmoon.AI.Terminal.Services
 {
     public class ContextManagerService
     {
-        public List<IExecuteTool> ExecuteTools { get; set; } = [
+        public List<IToolSet> ToolSets { get; set; } = [
             new FileTool(),
             new CommandTool(),
             new WaitTool(),
@@ -24,15 +24,15 @@ namespace Silmoon.AI.Terminal.Services
         }
         public void InjectMcp(ChatClient nativeClient)
         {
-            ExecuteTools.Add(new DeepThinkTool(nativeClient));
-            ExecuteTools.Add(new MemoryTool(nativeClient));
+            ToolSets.Add(new DeepThinkTool(nativeClient));
+            ToolSets.Add(new MemoryTool(nativeClient));
 
             string systemPrompt = SilmoonConfigureService.SystemPrompt;
             if (systemPrompt is not null) nativeClient.SystemPrompt += "\r\n" + systemPrompt;
 
-            foreach (var tool in ExecuteTools)
+            foreach (var toolSet in ToolSets)
             {
-                tool.InjectToolCall(nativeClient);
+                toolSet.InjectToolCall(nativeClient);
             }
         }
     }

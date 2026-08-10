@@ -30,9 +30,9 @@ public class ClientService : BackgroundService
         NativeClient.OnToolCallsFinish += NativeClient_OnToolCallsFinish;
         NativeClient.OnStreamOutputCompleted += NativeClient_OnStreamOutputCompleted;
         NativeClient.Tools.AddRange(makeTools());
-        NativeClient.AddExecuteTools([new FileTool(), new CommandTool(), new WaitTool(), new WorldStateTool()]);
+        NativeClient.AddToolSets([new FileTool(), new CommandTool(), new WaitTool(), new WorldStateTool()]);
         // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool
-        NativeClient.AddExecuteTools([new MemoryTool(NativeClient)]);
+        NativeClient.AddToolSets([new MemoryTool(NativeClient)]);
     }
 
     private async Task NativeClient_OnToolCallsStart(ToolCallParameter[] toolCallParameters)

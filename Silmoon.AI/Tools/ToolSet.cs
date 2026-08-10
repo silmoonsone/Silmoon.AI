@@ -11,12 +11,12 @@ using System.Text;
 
 namespace Silmoon.AI.Tools
 {
-    public abstract class ExecuteTool : IExecuteTool
+    public abstract class ToolSet : IToolSet
     {
         public Tool[] Tools { get; set; } = [];
         INativeClient NativeClient { get; set; }
         bool isInjected = false;
-        protected ExecuteTool()
+        protected ToolSet()
         {
             Tools = GetTools();
         }
@@ -27,12 +27,12 @@ namespace Silmoon.AI.Tools
             isInjected = true;
             NativeClient = nativeClient;
             NativeClient.Tools.AddRange(Tools);
-            NativeClient.ExecuteToolManager.OnToolCallInvoke += OnToolCallInvoke;
+            NativeClient.ToolSetManager.OnToolCallInvoke += OnToolCallInvoke;
             return true.ToStateSet("Tool call injected successfully.");
         }
 
-        public async Task NotifyToolExecuting(string functionName, ToolCallParameter toolCallParameter) => await NativeClient.ExecuteToolManager.onToolCallExecuting(functionName, toolCallParameter);
-        public async Task NotifyToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await NativeClient.ExecuteToolManager.onToolCallExecuted(functionName, toolCallParameter, toolCallResult);
+        public async Task NotifyToolExecuting(string functionName, ToolCallParameter toolCallParameter) => await NativeClient.ToolSetManager.onToolCallExecuting(functionName, toolCallParameter);
+        public async Task NotifyToolExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => await NativeClient.ToolSetManager.onToolCallExecuted(functionName, toolCallParameter, toolCallResult);
 
         public abstract Task<ToolCallResult> OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult);
     }

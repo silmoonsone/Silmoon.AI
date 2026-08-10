@@ -13,7 +13,7 @@ namespace Silmoon.AI.Tools;
 /// <summary>
 /// 记忆两阶段：（1）<see cref="GetSummarizePromptToolFunctionName"/> 将总结<strong>规范</strong>（<see cref="UtilPrompt.ContinuationMemoryPrompt"/>）通过 tool 结果交给模型，由模型按规范生成记忆正文；（2）<see cref="ApplyMemoryToolFunctionName"/> 用正文重置历史。
 /// </summary>
-public class MemoryTool : ExecuteTool
+public class MemoryTool : ToolSet
 {
     /// <summary>
     /// 第一步：取规范，生成记忆包正文。

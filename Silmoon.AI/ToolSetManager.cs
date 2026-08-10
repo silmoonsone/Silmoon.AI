@@ -9,7 +9,7 @@ using System.Text;
 
 namespace Silmoon.AI
 {
-    public class ExecuteToolManager
+    public class ToolSetManager
     {
         public event ToolCallsStartHandler OnToolCallsStart;
         public event ToolCallInvokeHandler OnToolCallInvoke;
@@ -17,26 +17,26 @@ namespace Silmoon.AI
 
         public event ToolExecutingHandler OnToolExecuting;
         public event ToolExecutedHandler OnToolExecuted;
-        public List<IExecuteTool> Tools { get; private set; } = [];
+        public List<IToolSet> ToolSets { get; private set; } = [];
         INativeClient NativeClient { get; set; }
-        public ExecuteToolManager(INativeClient nativeClient)
+        public ToolSetManager(INativeClient nativeClient)
         {
             NativeClient = nativeClient;
         }
-        public StateSet<bool> AddExecuteTool(IExecuteTool tool)
+        public StateSet<bool> AddToolSet(IToolSet toolSet)
         {
-            foreach (var item in tool.Tools)
+            foreach (var item in toolSet.Tools)
             {
-                var existsTool = Tools.SelectMany(x => x.Tools).Where(y => string.Equals(y.Function?.Name, item.Function?.Name, StringComparison.Ordinal));
+                var existsTool = ToolSets.SelectMany(x => x.Tools).Where(y => string.Equals(y.Function?.Name, item.Function?.Name, StringComparison.Ordinal));
                 if (existsTool.Any()) return false.ToStateSet($"此{existsTool.FirstOrDefault().GetType().Name}已存在。");
             }
-            var result = tool.InjectToolCall(NativeClient);
-            if (result.State) Tools.Add(tool);
+            var result = toolSet.InjectToolCall(NativeClient);
+            if (result.State) ToolSets.Add(toolSet);
             return result;
         }
         internal Task onToolCallExecuting(string functionName, ToolCallParameter toolCallParameter) => OnToolExecuting is null ? Task.CompletedTask : OnToolExecuting(functionName, toolCallParameter);
         internal Task onToolCallExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => OnToolExecuted is null ? Task.CompletedTask : OnToolExecuted(functionName, toolCallParameter, toolCallResult);
-        public void AddExecuteTools(IExecuteTool[] tools) => tools.Each(x => AddExecuteTool(x));
+        public void AddToolSets(IToolSet[] toolSets) => toolSets.Each(x => AddToolSet(x));
         public async Task<ToolCallResult[]> ToolCalls(ToolCallParameter[] toolCallParameters)
         {
             List<Task<ToolCallResult>> toolCallTasks = [];

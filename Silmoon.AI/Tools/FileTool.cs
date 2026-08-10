@@ -9,7 +9,7 @@ using System.Text;
 
 namespace Silmoon.AI.Tools
 {
-    public class FileTool : ExecuteTool
+    public class FileTool : ToolSet
     {
         public const string FileFunctionName = "File_File";
         public const string ReadLinesFunctionName = "File_ReadLines";
