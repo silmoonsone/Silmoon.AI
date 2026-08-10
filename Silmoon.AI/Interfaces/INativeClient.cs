@@ -32,6 +32,10 @@ public interface INativeClient : IDisposable
     void ClearHistory(string? continuation = null);
     void RollbackHistory(uint rounds = 1);
     void RebuildHttpClient();
+
+    StateSet<bool> AddExecuteTool(IExecuteTool executeTool);
+    void AddExecuteTools(IExecuteTool[] executeTools);
+
     IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
     IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");
     IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions");

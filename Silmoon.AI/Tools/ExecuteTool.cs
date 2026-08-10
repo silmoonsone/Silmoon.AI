@@ -2,6 +2,7 @@
 using Silmoon.AI.Interfaces;
 using Silmoon.AI.Models;
 using Silmoon.AI.OpenAI.Models;
+using Silmoon.Extensions;
 using Silmoon.Models;
 using System;
 using System.Collections.Concurrent;
@@ -14,16 +15,20 @@ namespace Silmoon.AI.Tools
     {
         public Tool[] Tools { get; set; } = [];
         INativeClient NativeClient { get; set; }
+        bool isInjected = false;
         protected ExecuteTool()
         {
             Tools = GetTools();
         }
         public abstract Tool[] GetTools();
-        public virtual void InjectToolCall(INativeClient nativeClient)
+        public virtual StateSet<bool> InjectToolCall(INativeClient nativeClient)
         {
+            if (isInjected) return false.ToStateSet("Tool call already injected.");
+            isInjected = true;
             NativeClient = nativeClient;
             NativeClient.Tools.AddRange(Tools);
             NativeClient.ExecuteToolManager.OnToolCallInvoke += OnToolCallInvoke;
+            return true.ToStateSet("Tool call injected successfully.");
         }
 
         public async Task NotifyToolExecuting(string functionName, ToolCallParameter toolCallParameter) => await NativeClient.ExecuteToolManager.onToolCallExecuting(functionName, toolCallParameter);

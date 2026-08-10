@@ -13,46 +13,10 @@ using Silmoon.Threading;
 
 namespace Silmoon.AI.Anthropic;
 
-public class AnthropicClient : INativeClient
+public class AnthropicClient : NativeClient
 {
-    public event ToolCallsStartHandler OnToolCallsStart;
-    public event ToolCallInvokeHandler OnToolCallInvoke;
-    public event ToolExecutingHandler OnToolExecuting;
-    public event ToolExecutedHandler OnToolExecuted;
-    public event ToolCallsFinishHandler OnToolCallsFinish;
-    public event StreamOutputHandler OnStreamOutput;
-    public event StreamOutputCompletedHandler OnStreamOutputCompleted;
-
-    public ModelProvider ModelProvider { get; set; }
-    public string ModelName { get; set; }
-    public ExecuteToolManager ExecuteToolManager { get; set; }
-    public List<Tool> Tools { get; set; } = [];
-    public NativeMessageCollection MessageHistory { get; set; } = [];
-    public bool EnableThinking { get; set; } = false;
-    public double? Temperature { get; set; } = RequestBase.DefaultTemperature;
-    public double? TopP { get; set; } = RequestBase.DefaultTopP;
-    public ManualResetEvent BusyResetEvent { get; private set; } = new(true);
-    public AsyncLock BusyAsyncLock { get; private set; } = new();
-
     AnthropicHttpClient HttpClient { get; set; }
 
-    public string SystemPrompt
-    {
-        get => (MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent)?.Content;
-        set
-        {
-            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent;
-            if (value is null)
-            {
-                if (systemMessage is not null) MessageHistory.Remove(systemMessage);
-            }
-            else
-            {
-                if (systemMessage is null) MessageHistory.Insert(0, NativeMessageContent.Create(Role.System, value));
-                else systemMessage.Content = value;
-            }
-        }
-    }
 
     public AnthropicClient(ModelProvider provider, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
     {
@@ -61,16 +25,18 @@ public class AnthropicClient : INativeClient
         SystemPrompt = systemPrompt;
         Temperature = temperature ?? RequestBase.DefaultTemperature;
         TopP = topP ?? RequestBase.DefaultTopP;
+
         ExecuteToolManager = new ExecuteToolManager(this);
-        ExecuteToolManager.OnToolCallsStart += async p => await (OnToolCallsStart?.Invoke(p) ?? Task.CompletedTask);
-        ExecuteToolManager.OnToolCallInvoke += async (p, r) => OnToolCallInvoke is null ? r : await OnToolCallInvoke.Invoke(p, r);
-        ExecuteToolManager.OnToolCallsFinish += async (p, r) => OnToolCallsFinish is null ? r : await OnToolCallsFinish.Invoke(p, r);
-        ExecuteToolManager.OnToolExecuting += async (name, p) => await (OnToolExecuting?.Invoke(name, p) ?? Task.CompletedTask);
-        ExecuteToolManager.OnToolExecuted += async (name, p, r) => await (OnToolExecuted?.Invoke(name, p, r) ?? Task.CompletedTask);
+
+        ExecuteToolManager.OnToolCallsStart += onToolCallsStart;
+        ExecuteToolManager.OnToolCallInvoke += onToolCallInvoke;
+        ExecuteToolManager.OnToolCallsFinish += onToolCallsFinish;
+        ExecuteToolManager.OnToolExecuting += onToolCallExecuting;
+        ExecuteToolManager.OnToolExecuted += onToolCallExecuted;
+
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public AnthropicClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
-        : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds, temperature, topP)
+    public AnthropicClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, disableProxy, httpRequestTimeoutMilliseconds, temperature, topP)
     {
     }
 
@@ -81,37 +47,36 @@ public class AnthropicClient : INativeClient
         RebuildHttpClient();
     }
 
-    public void RebuildHttpClient()
+    public override void RebuildHttpClient()
     {
         HttpClient.DefaultRequestHeaders.Clear();
         if (!ModelProvider.ApiKey.IsNullOrEmpty())
             HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
         HttpClient.DefaultRequestHeaders.Add("anthropic-version", ModelProvider.AnthropicVersion.IsNullOrEmpty() ? "2023-06-01" : ModelProvider.AnthropicVersion);
     }
-
-    public void ClearHistory(string? continuation = null)
+    public override void ClearHistory(string? continuation = null)
     {
         var systemPrompt = SystemPrompt;
         MessageHistory.Clear();
         if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.System, systemPrompt));
         if (!continuation.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.User, continuation));
     }
+    public override void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
 
-    public void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         await foreach (var chunk in CompletionsStreamAsync(NativeMessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
             yield return chunk;
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
             yield return chunk;
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
-        using var _ = await BusyAsyncLock.LockAsync();
+        using var releaser = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
         model ??= ModelName;
         chunks ??= [];
@@ -145,7 +110,7 @@ public class AnthropicClient : INativeClient
 
                 await foreach (var item in channel.Reader.ReadAllAsync())
                 {
-                    await (OnStreamOutput?.Invoke(item) ?? Task.CompletedTask);
+                    _ = onStreamOutput(item);
                     yield return item;
                 }
 
@@ -153,7 +118,7 @@ public class AnthropicClient : INativeClient
                 if (!nativeStates.State) break;
 
                 var result = BuildResultFromAnthropicEvents(streamEvents);
-                await (OnStreamOutputCompleted?.Invoke(result) ?? Task.CompletedTask);
+                _ = onStreamOutputCompleted(result);
                 if (result.FinishReason == "tool_calls" && !result.ToolCalls.IsNullOrEmpty())
                 {
                     messageHistory.Add(NativeMessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
@@ -180,13 +145,13 @@ public class AnthropicClient : INativeClient
         }
     }
 
-    public Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages") => CompletionsAsync(NativeMessageContent.Create(Role.User, content), tools, model, completionsUrl);
-    public async Task<ChatCompletionsResponse> CompletionsAsync(INativeMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public override Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages") => CompletionsAsync(NativeMessageContent.Create(Role.User, content), tools, model, completionsUrl);
+    public override async Task<ChatCompletionsResponse> CompletionsAsync(INativeMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<ChatCompletionsResponse> CompletionsAsync(NativeMessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
+    public override async Task<ChatCompletionsResponse> CompletionsAsync(NativeMessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/messages")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -378,15 +343,9 @@ public class AnthropicClient : INativeClient
         ],
     };
 
-    public void Dispose()
+    public override void Dispose()
     {
-        OnToolCallsStart = null;
-        OnToolCallInvoke = null;
-        OnToolCallsFinish = null;
-        OnToolExecuting = null;
-        OnToolExecuted = null;
-        OnStreamOutput = null;
-        OnStreamOutputCompleted = null;
+        base.Dispose();
         Tools?.Clear();
         MessageHistory?.Clear();
         HttpClient?.Dispose();

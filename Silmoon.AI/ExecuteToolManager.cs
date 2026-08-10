@@ -23,16 +23,16 @@ namespace Silmoon.AI
         {
             NativeClient = nativeClient;
         }
-        public StateSet<bool, IExecuteTool> AddExecuteTool(IExecuteTool tool)
+        public StateSet<bool> AddExecuteTool(IExecuteTool tool)
         {
             foreach (var item in tool.Tools)
             {
-                var existsFunctionTool = Tools.Where(x => x.Tools.Any(y => y.Function == item.Function));
-                if (existsFunctionTool.Any()) return false.ToStateSet(existsFunctionTool.FirstOrDefault(), "此Tool Function已存在。");
+                var existsTool = Tools.SelectMany(x => x.Tools).Where(y => string.Equals(y.Function?.Name, item.Function?.Name, StringComparison.Ordinal));
+                if (existsTool.Any()) return false.ToStateSet($"此{existsTool.FirstOrDefault().GetType().Name}已存在。");
             }
-            tool.InjectToolCall(NativeClient);
-            Tools.Add(tool);
-            return true.ToStateSet(tool);
+            var result = tool.InjectToolCall(NativeClient);
+            if (result.State) Tools.Add(tool);
+            return result;
         }
         internal Task onToolCallExecuting(string functionName, ToolCallParameter toolCallParameter) => OnToolExecuting is null ? Task.CompletedTask : OnToolExecuting(functionName, toolCallParameter);
         internal Task onToolCallExecuted(string functionName, ToolCallParameter toolCallParameter, ToolCallResult toolCallResult) => OnToolExecuted is null ? Task.CompletedTask : OnToolExecuted(functionName, toolCallParameter, toolCallResult);

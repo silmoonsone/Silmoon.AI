@@ -17,26 +17,22 @@ namespace Silmoon.AI.ChatClientTest.Services;
 public class ClientService : BackgroundService
 {
     ChatClient NativeClient { get; set; }
-    SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
     IHostApplicationLifetime ApplicationLifetime { get; set; }
     bool Streaming { get; set; } = true;
     public ClientService(ISilmoonConfigureService silmoonConfigureService, IHostApplicationLifetime applicationLifetime)
     {
         ApplicationLifetime = applicationLifetime;
-        SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
-        NativeClient = new ChatClient(SilmoonConfigureService.ApiUrl, SilmoonConfigureService.Key, SilmoonConfigureService.ProviderName, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
+        var configure = (SilmoonConfigureServiceImpl)silmoonConfigureService;
+        NativeClient = new ChatClient(configure.ApiUrl, configure.Key, configure.ProviderName, configure.ModelName, UtilPrompt.ContextPrompt);
         NativeClient.OnToolCallsStart += NativeClient_OnToolCallsStart;
         NativeClient.OnToolExecuting += NativeClient_OnToolExecuting;
         NativeClient.OnToolExecuted += NativeClient_OnToolExecuted;
         NativeClient.OnToolCallsFinish += NativeClient_OnToolCallsFinish;
         NativeClient.OnStreamOutputCompleted += NativeClient_OnStreamOutputCompleted;
         NativeClient.Tools.AddRange(makeTools());
-        new FileTool().InjectToolCall(NativeClient);
-        new CommandTool().InjectToolCall(NativeClient);
-        new WaitTool().InjectToolCall(NativeClient);
-        new WorldStateTool().InjectToolCall(NativeClient);
+        NativeClient.AddExecuteTools([new FileTool(), new CommandTool(), new WaitTool(), new WorldStateTool()]);
         // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool
-        new MemoryTool(NativeClient).InjectToolCall(NativeClient);
+        NativeClient.AddExecuteTools([new MemoryTool(NativeClient)]);
         //NativeClient.EnableThinking = true;
     }
 

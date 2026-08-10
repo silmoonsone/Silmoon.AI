@@ -11,7 +11,7 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 | 统一客户端 | 通过 `NativeClientFactory.Create(...)` 根据 `ModelProvider.ApiKind` 创建统一的 `INativeClient`。 |
 | OpenAI Chat Completions | `ChatClient` 支持 OpenAI-Compatible `/chat/completions`，包含普通请求、SSE 流式、工具调用和部分厂商的 thinking 字段适配。 |
 | Anthropic Messages | `AnthropicClient` 支持 Anthropic Messages 风格接口，并把返回结果适配为库内通用的 Chat Completions 结果模型。 |
-| OpenAI Responses | `ResponsesClient` 已补齐 OpenAI Responses API 的普通请求、SSE 流式、工具调用和统一结果模型适配；当前尚未完成真实接口联调验证。 |
+| OpenAI Responses | `ResponsesClient` 已补齐 OpenAI Responses API 的普通请求、SSE 流式、工具调用和统一结果模型适配，已通过 DeepSeek Responses 冒烟验证。 |
 | SSE 传输 | `SseHttpClient` 已从 Chat Completions 实现中抽出，可作为独立的 SSE HTTP 请求封装复用。 |
 | 工具调用 | 使用 `Tool` 声明函数 schema，通过 `ExecuteToolManager` 执行模型返回的 `tool_calls`，并自动把工具结果写回历史继续对话。 |
 | 内置工具 | `FileTool`、`CommandTool`、`WaitTool`、`WorldStateTool`、`MemoryTool` 等位于 `Silmoon.AI/Tools`。 |
@@ -25,7 +25,7 @@ Silmoon.AI 是一个基于 .NET 的轻量 AI Native API 客户端库，面向聊
 | 值 | 客户端 | 状态 |
 |----|--------|------|
 | `Chat` | `ChatClient` | 当前主力实现，适配 OpenAI-Compatible 厂商。 |
-| `Responses` | `ResponsesClient` | 代码实现已完成，适配 OpenAI Responses API；当前尚未完成真实接口联调验证。 |
+| `Responses` | `ResponsesClient` | 已实现，适配 OpenAI Responses API，已通过 DeepSeek Responses 冒烟验证。 |
 | `Anthropic` | `AnthropicClient` | 已实现，当前主要用于 DeepSeek Anthropic 兼容接口测试。 |
 
 统一创建方式：
@@ -60,12 +60,13 @@ Silmoon.AI/                         核心类库
   Interfaces/                       INativeClient 等公共接口
   Models/                           跨接口共享模型
   Tools/                            内置工具
+  NativeClient.cs                   Chat / Responses / Anthropic 共享的客户端基类
   SseHttpClient.cs                  独立 SSE HTTP 客户端封装
 
 Silmoon.AI.HostingTest/             统一 INativeClient 调用示例
 Silmoon.AI.ChatClientTest/          OpenAI Chat Completions 原生客户端测试
 Silmoon.AI.AnthropicClientTest/     Anthropic Messages 原生客户端测试
-Silmoon.AI.ResponsesClientTest/     OpenAI Responses 原生客户端测试占位项目
+Silmoon.AI.ResponsesClientTest/     OpenAI Responses 原生客户端测试
 Silmoon.AI.Terminal/                终端示例
 Silmoon.AI.WinFormTest/             WinForms 示例
 ```
@@ -111,7 +112,7 @@ dotnet run --project ./Silmoon.AI.AnthropicClientTest/Silmoon.AI.AnthropicClient
 dotnet run --project ./Silmoon.AI.ResponsesClientTest/Silmoon.AI.ResponsesClientTest.csproj
 ```
 
-`Silmoon.AI.ResponsesClientTest` 目前只是为后续 Responses API 联调准备的空测试项目，还没有覆盖真实请求流程。
+`Silmoon.AI.ResponsesClientTest` 已补齐交互式测试入口，支持普通请求、流式请求和基础工具调用冒烟验证。
 
 控制台示例常用命令：
 
@@ -119,8 +120,8 @@ dotnet run --project ./Silmoon.AI.ResponsesClientTest/Silmoon.AI.ResponsesClient
 |------|------|
 | `@clear` | 清空当前会话历史。 |
 | `@exit` | 退出程序。 |
-| `@stream` | Anthropic 测试项目切换到流式模式。 |
-| `@nostream` | Anthropic 测试项目切换到非流式模式。 |
+| `@stream` | 支持流式切换的测试项目切换到流式模式。 |
+| `@nostream` | 支持流式切换的测试项目切换到非流式模式。 |
 
 ## 最小调用示例
 
@@ -217,10 +218,14 @@ client.OnToolCallInvoke += (parameter, currentResult) =>
 内置工具可直接注入：
 
 ```csharp
-new WaitTool().InjectToolCall(client);
-new WorldStateTool().InjectToolCall(client);
-new MemoryTool(client).InjectToolCall(client);
+client.AddExecuteTools([
+    new WaitTool(),
+    new WorldStateTool(),
+    new MemoryTool(client)
+]);
 ```
+
+`AddExecuteTool(...)` / `AddExecuteTools(...)` 会通过 `ExecuteToolManager` 完成工具 schema 注册和调用事件注入，并按 function name 检查重复工具。
 
 `FileTool` 和 `CommandTool` 能访问文件系统或执行命令，实际产品中应按宿主环境做好权限边界。
 

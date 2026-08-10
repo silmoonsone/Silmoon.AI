@@ -16,28 +16,23 @@ namespace Silmoon.AI.HostingTest.Services;
 
 public class ClientService : BackgroundService
 {
-    INativeClient Client { get; set; }
-    SilmoonConfigureServiceImpl SilmoonConfigureService { get; set; }
+    INativeClient NativeClient { get; set; }
     IHostApplicationLifetime ApplicationLifetime { get; set; }
     bool Streaming { get; set; } = true;
     public ClientService(ISilmoonConfigureService silmoonConfigureService, IHostApplicationLifetime applicationLifetime)
     {
         ApplicationLifetime = applicationLifetime;
-        SilmoonConfigureService = silmoonConfigureService as SilmoonConfigureServiceImpl;
-        Client = NativeClientFactory.Create(SilmoonConfigureService.Provider, SilmoonConfigureService.ModelName, UtilPrompt.ContextPrompt);
-        Client.OnToolCallsStart += NativeClient_OnToolCallsStart;
-        Client.OnToolExecuting += NativeClient_OnToolExecuting;
-        Client.OnToolExecuted += NativeClient_OnToolExecuted;
-        Client.OnToolCallsFinish += NativeClient_OnToolCallsFinish;
-        Client.OnStreamOutputCompleted += NativeClient_OnStreamOutputCompleted;
-        Client.Tools.AddRange(makeTools());
-        new FileTool().InjectToolCall(Client);
-        new CommandTool().InjectToolCall(Client);
-        new WaitTool().InjectToolCall(Client);
-        new WorldStateTool().InjectToolCall(Client);
+        var configure = silmoonConfigureService as SilmoonConfigureServiceImpl;
+        NativeClient = NativeClientFactory.Create(configure.Provider, configure.ModelName, UtilPrompt.ContextPrompt);
+        NativeClient.OnToolCallsStart += NativeClient_OnToolCallsStart;
+        NativeClient.OnToolExecuting += NativeClient_OnToolExecuting;
+        NativeClient.OnToolExecuted += NativeClient_OnToolExecuted;
+        NativeClient.OnToolCallsFinish += NativeClient_OnToolCallsFinish;
+        NativeClient.OnStreamOutputCompleted += NativeClient_OnStreamOutputCompleted;
+        NativeClient.Tools.AddRange(makeTools());
+        NativeClient.AddExecuteTools([new FileTool(), new CommandTool(), new WaitTool(), new WorldStateTool()]);
         // Inject 须在宿主 OnToolCallInvoke 之后，使续接工具的处理排在多播链末尾，覆盖 default→CommandTool
-        new MemoryTool(Client).InjectToolCall(Client);
-        //Client.EnableThinking = true;
+        NativeClient.AddExecuteTools([new MemoryTool(NativeClient)]);
     }
 
     private async Task NativeClient_OnToolCallsStart(ToolCallParameter[] toolCallParameters)
@@ -122,7 +117,7 @@ public class ClientService : BackgroundService
                 switch (command)
                 {
                     case "clear":
-                        Client.ClearHistory();
+                        NativeClient.ClearHistory();
                         Console.WriteLine("Message history cleared.");
                         break;
                     case "exit":
@@ -141,7 +136,7 @@ public class ClientService : BackgroundService
                 if (Streaming)
                 {
                     List<ChatCompletionsChunk> chunks = [];
-                    await foreach (var chunk in Client.CompletionsStreamAsync(input, chunks))
+                    await foreach (var chunk in NativeClient.CompletionsStreamAsync(input, chunks))
                     {
                         if (chunk.State)
                         {
@@ -162,7 +157,7 @@ public class ClientService : BackgroundService
                 }
                 else
                 {
-                    ChatCompletionsResponse response = await Client.CompletionsAsync(input);
+                    ChatCompletionsResponse response = await NativeClient.CompletionsAsync(input);
                     response.Choices.Each(x => Console.WriteWithColor(x?.Message?.Content, ConsoleColor.White));
                     Console.WriteLine($"FinishReason={response.Choices[0].FinishReason}");
                     if (response.Choices[0].FinishReason == "tool_calls") Console.WriteWithColor(response.Choices[0].Message.ToolCalls?.ToFormattedJsonString(), ConsoleColor.DarkYellow);

@@ -12,46 +12,9 @@ using Silmoon.Threading;
 
 namespace Silmoon.AI.OpenAI;
 
-public class ResponsesClient : INativeClient
+public class ResponsesClient : NativeClient
 {
-    public event ToolCallsStartHandler OnToolCallsStart;
-    public event ToolCallInvokeHandler OnToolCallInvoke;
-    public event ToolExecutingHandler OnToolExecuting;
-    public event ToolExecutedHandler OnToolExecuted;
-    public event ToolCallsFinishHandler OnToolCallsFinish;
-    public event StreamOutputHandler OnStreamOutput;
-    public event StreamOutputCompletedHandler OnStreamOutputCompleted;
-
-    public ModelProvider ModelProvider { get; set; }
-    public string ModelName { get; set; }
-    public ExecuteToolManager ExecuteToolManager { get; set; }
-    public bool EnableThinking { get; set; } = false;
-    public double? Temperature { get; set; } = RequestBase.DefaultTemperature;
-    public double? TopP { get; set; } = RequestBase.DefaultTopP;
-    public List<Tool> Tools { get; set; } = [];
-    public NativeMessageCollection MessageHistory { get; set; } = [];
-    public ManualResetEvent BusyResetEvent { get; private set; } = new(true);
-    public AsyncLock BusyAsyncLock { get; private set; } = new();
-
     ResponsesHttpClient HttpClient { get; set; }
-
-    public string SystemPrompt
-    {
-        get => (MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent)?.Content;
-        set
-        {
-            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent;
-            if (value is null)
-            {
-                if (systemMessage is not null) MessageHistory.Remove(systemMessage);
-            }
-            else
-            {
-                if (systemMessage is null) MessageHistory.Insert(0, NativeMessageContent.Create(Role.System, value));
-                else systemMessage.Content = value;
-            }
-        }
-    }
 
     public ResponsesClient(ModelProvider modelProvider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
     {
@@ -61,16 +24,18 @@ public class ResponsesClient : INativeClient
         EnableThinking = enableThinking;
         Temperature = temperature ?? RequestBase.DefaultTemperature;
         TopP = topP ?? RequestBase.DefaultTopP;
+
         ExecuteToolManager = new ExecuteToolManager(this);
-        ExecuteToolManager.OnToolCallsStart += async p => await (OnToolCallsStart?.Invoke(p) ?? Task.CompletedTask);
-        ExecuteToolManager.OnToolCallInvoke += async (p, r) => OnToolCallInvoke is null ? r : await OnToolCallInvoke.Invoke(p, r);
-        ExecuteToolManager.OnToolCallsFinish += async (p, r) => OnToolCallsFinish is null ? r : await OnToolCallsFinish.Invoke(p, r);
-        ExecuteToolManager.OnToolExecuting += async (name, p) => await (OnToolExecuting?.Invoke(name, p) ?? Task.CompletedTask);
-        ExecuteToolManager.OnToolExecuted += async (name, p, r) => await (OnToolExecuted?.Invoke(name, p, r) ?? Task.CompletedTask);
+
+        ExecuteToolManager.OnToolCallsStart += onToolCallsStart;
+        ExecuteToolManager.OnToolCallInvoke += onToolCallInvoke;
+        ExecuteToolManager.OnToolCallsFinish += onToolCallsFinish;
+        ExecuteToolManager.OnToolExecuting += onToolCallExecuting;
+        ExecuteToolManager.OnToolExecuted += onToolCallExecuted;
+
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
-    public ResponsesClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
-        : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds, temperature, topP)
+    public ResponsesClient(string apiUrl, string apiKey, string providerName, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null) : this(ModelProvider.Create(apiUrl, apiKey, providerName, modelName), modelName, systemPrompt, enableThinking, disableProxy, httpRequestTimeoutMilliseconds, temperature, topP)
     {
     }
 
@@ -81,39 +46,35 @@ public class ResponsesClient : INativeClient
         RebuildHttpClient();
     }
 
-    public void RebuildHttpClient()
+    public override void RebuildHttpClient()
     {
         HttpClient.DefaultRequestHeaders.Clear();
         if (!ModelProvider.ApiKey.IsNullOrEmpty())
             HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
-
-    public void ClearHistory(string? continuation = null)
+    public override void ClearHistory(string? continuation = null)
     {
         var systemPrompt = SystemPrompt;
         MessageHistory.Clear();
         if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.System, systemPrompt));
         if (!continuation.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.User, continuation));
     }
+    public override void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
 
-    public void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
-
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
     {
         await foreach (var chunk in CompletionsStreamAsync(NativeMessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
             yield return chunk;
     }
-
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
             yield return chunk;
     }
-
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
     {
-        using var _ = await BusyAsyncLock.LockAsync();
+        using var releaser = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
         model ??= ModelName;
         chunks ??= [];
@@ -155,7 +116,7 @@ public class ResponsesClient : INativeClient
 
                 await foreach (var item in channel.Reader.ReadAllAsync())
                 {
-                    await (OnStreamOutput?.Invoke(item) ?? Task.CompletedTask);
+                    _ = onStreamOutput(item);
                     yield return item;
                 }
 
@@ -163,7 +124,7 @@ public class ResponsesClient : INativeClient
                 if (!nativeStates.State) break;
 
                 var result = completedResponse is not null ? BuildResult(completedResponse) : BuildResultFromStreamEvents(streamEvents);
-                await (OnStreamOutputCompleted?.Invoke(result) ?? Task.CompletedTask);
+                _ = onStreamOutputCompleted(result);
                 if (result.FinishReason == "tool_calls" && !result.ToolCalls.IsNullOrEmpty())
                 {
                     messageHistory.Add(NativeMessageContent.Create(Role.Assistant, result.Content, [.. result.ToolCalls]));
@@ -183,14 +144,13 @@ public class ResponsesClient : INativeClient
         }
     }
 
-    public Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses") => CompletionsAsync(NativeMessageContent.Create(Role.User, content), tools, model, completionsUrl);
-    public async Task<ChatCompletionsResponse> CompletionsAsync(INativeMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
+    public override Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses") => CompletionsAsync(NativeMessageContent.Create(Role.User, content), tools, model, completionsUrl);
+    public override async Task<ChatCompletionsResponse> CompletionsAsync(INativeMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-
-    public async Task<ChatCompletionsResponse> CompletionsAsync(NativeMessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
+    public override async Task<ChatCompletionsResponse> CompletionsAsync(NativeMessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/v1/responses")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -266,13 +226,11 @@ public class ResponsesClient : INativeClient
         }
         return input;
     }
-
     static JObject CreateMessageInput(string role, string content) => new()
     {
         ["role"] = role,
         ["content"] = content,
     };
-
     static JObject CreateFunctionCallInput(ToolCall toolCall) => new()
     {
         ["type"] = "function_call",
@@ -280,7 +238,6 @@ public class ResponsesClient : INativeClient
         ["name"] = toolCall.Function?.Name,
         ["arguments"] = toolCall.Function?.Arguments ?? "{}",
     };
-
     static JArray CreateTools(List<Tool> tools)
     {
         if (tools.IsNullOrEmpty()) return null;
@@ -527,15 +484,9 @@ public class ResponsesClient : INativeClient
         return value > int.MaxValue ? int.MaxValue : (int)value;
     }
 
-    public void Dispose()
+    public override void Dispose()
     {
-        OnToolCallsStart = null;
-        OnToolCallInvoke = null;
-        OnToolCallsFinish = null;
-        OnToolExecuting = null;
-        OnToolExecuted = null;
-        OnStreamOutput = null;
-        OnStreamOutputCompleted = null;
+        base.Dispose();
         Tools?.Clear();
         MessageHistory?.Clear();
         HttpClient?.Dispose();

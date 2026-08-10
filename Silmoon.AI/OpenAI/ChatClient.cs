@@ -13,45 +13,9 @@ using Silmoon.Threading;
 
 namespace Silmoon.AI.OpenAI;
 
-public class ChatClient : INativeClient
+public class ChatClient : NativeClient
 {
-    public event ToolCallsStartHandler OnToolCallsStart;
-    public event ToolCallInvokeHandler OnToolCallInvoke;
-    public event ToolExecutingHandler OnToolExecuting;
-    public event ToolExecutedHandler OnToolExecuted;
-    public event ToolCallsFinishHandler OnToolCallsFinish;
-    public event StreamOutputHandler OnStreamOutput;
-    public event StreamOutputCompletedHandler OnStreamOutputCompleted;
-    public ModelProvider ModelProvider { get; set; }
-    public string ModelName { get; set; }
     ChatHttpClient HttpClient { get; set; }
-    public ExecuteToolManager ExecuteToolManager { get; set; }
-    public ManualResetEvent BusyResetEvent { get; private set; } = new ManualResetEvent(true);
-    public AsyncLock BusyAsyncLock { get; private set; } = new AsyncLock();
-
-    public bool EnableThinking { get; set; } = false;
-    public double? Temperature { get; set; } = RequestBase.DefaultTemperature;
-    public double? TopP { get; set; } = RequestBase.DefaultTopP;
-    public NativeMessageCollection MessageHistory { get; set; } = [];
-
-    public string SystemPrompt
-    {
-        set
-        {
-            var systemMessage = MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent;
-            if (value is null)
-            {
-                if (systemMessage is not null) MessageHistory.Remove(systemMessage);
-            }
-            else
-            {
-                if (systemMessage is null) MessageHistory.Insert(0, NativeMessageContent.Create(Role.System, value));
-                else systemMessage.Content = value;
-            }
-        }
-        get => (MessageHistory.FirstOrDefault(m => m.Role == Role.System) as NativeMessageContent)?.Content;
-    }
-    public List<Tool> Tools { get; set; } = [];
 
     public ChatClient(ModelProvider provider, string modelName, string systemPrompt = null, bool enableThinking = false, bool disableProxy = false, int? httpRequestTimeoutMilliseconds = null, double? temperature = null, double? topP = null)
     {
@@ -64,11 +28,11 @@ public class ChatClient : INativeClient
 
         ExecuteToolManager = new ExecuteToolManager(this);
 
-        ExecuteToolManager.OnToolCallsStart += async (toolCallParameters) => await (OnToolCallsStart is null ? Task.CompletedTask : OnToolCallsStart.Invoke(toolCallParameters));
-        ExecuteToolManager.OnToolCallInvoke += async (toolCallParameter, toolCallResult) => await (OnToolCallInvoke is null ? Task.FromResult(toolCallResult) : OnToolCallInvoke.Invoke(toolCallParameter, toolCallResult));
-        ExecuteToolManager.OnToolCallsFinish += async (toolCallParameters, toolCallResults) => await (OnToolCallsFinish is null ? Task.FromResult(toolCallResults) : OnToolCallsFinish.Invoke(toolCallParameters, toolCallResults));
-        ExecuteToolManager.OnToolExecuting += async (functionName, toolCallParameter) => await (OnToolExecuting is null ? Task.CompletedTask : OnToolExecuting.Invoke(functionName, toolCallParameter));
-        ExecuteToolManager.OnToolExecuted += async (functionName, toolCallParameter, toolCallResult) => await (OnToolExecuted is null ? Task.CompletedTask : OnToolExecuted.Invoke(functionName, toolCallParameter, toolCallResult));
+        ExecuteToolManager.OnToolCallsStart += onToolCallsStart;
+        ExecuteToolManager.OnToolCallInvoke += onToolCallInvoke;
+        ExecuteToolManager.OnToolCallsFinish += onToolCallsFinish;
+        ExecuteToolManager.OnToolExecuting += onToolCallExecuting;
+        ExecuteToolManager.OnToolExecuted += onToolCallExecuted;
 
         BuildHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
     }
@@ -82,28 +46,28 @@ public class ChatClient : INativeClient
         HttpClient = new ChatHttpClient(disableProxy, httpRequestTimeoutMilliseconds);
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
-    public void RebuildHttpClient()
+    public override void RebuildHttpClient()
     {
         HttpClient.DefaultRequestHeaders.Clear();
         HttpClient.DefaultRequestHeaders.Add("Authorization", $"Bearer {ModelProvider.ApiKey}");
     }
-    public void ClearHistory(string continuation = null)
+    public override void ClearHistory(string continuation = null)
     {
         var systemPrompt = SystemPrompt;
         MessageHistory.Clear();
         if (!systemPrompt.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.System, systemPrompt));
         if (!continuation.IsNullOrEmpty()) MessageHistory.Add(NativeMessageContent.Create(Role.User, continuation));
     }
-    public void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
+    public override void RollbackHistory(uint rounds = 1) => MessageHistory.RollbackRounds(rounds);
 
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(string content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         await foreach (var chunk in CompletionsStreamAsync(NativeMessageContent.Create(Role.User, content), chunks, tools, model, completionsUrl))
         {
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(INativeMessage content, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         await foreach (var chunk in CompletionsStreamAsync(MessageHistory, chunks, tools, model, completionsUrl))
@@ -111,19 +75,21 @@ public class ChatClient : INativeClient
             yield return chunk;
         }
     }
-    public async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public override async IAsyncEnumerable<StateSet<bool, ChatCompletionsChunk>> CompletionsStreamAsync(NativeMessageCollection messageHistory, List<ChatCompletionsChunk> chunks = null, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
-        using var _ = await BusyAsyncLock.LockAsync();
+        using var releaser = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
         model ??= ModelName;
         chunks ??= [];
         while (true)
         {
-            var request = new ChatCompletionsRequest(model, [.. messageHistory]);
-            request.Temperature = Temperature;
-            request.TopP = TopP;
+            var request = new ChatCompletionsRequest(model, [.. messageHistory])
+            {
+                Temperature = Temperature,
+                TopP = TopP,
+                Tools = tools ?? Tools
+            };
             request.SetEnableThinking(EnableThinking, ModelProvider.ApiUrl, ModelProvider.ProviderName, model);
-            request.Tools = tools ?? Tools;
 
 
             Channel<StateSet<bool, ChatCompletionsChunk>> channel = Channel.CreateUnbounded<StateSet<bool, ChatCompletionsChunk>>();
@@ -149,7 +115,7 @@ public class ChatClient : INativeClient
 
             await foreach (var chunk in channel.Reader.ReadAllAsync())
             {
-                OnStreamOutput?.Invoke(chunk);
+                _ = onStreamOutput(chunk);
                 yield return chunk;
             }
 
@@ -157,7 +123,7 @@ public class ChatClient : INativeClient
             if (chunkStates.State)
             {
                 var result = Result.Create([.. chunkStates.Data], EnableThinking);
-                OnStreamOutputCompleted?.Invoke(result);
+                _ = onStreamOutputCompleted(result);
                 callTools:
                 if (result.FinishReason == "stop")
                 {
@@ -199,13 +165,13 @@ public class ChatClient : INativeClient
         BusyResetEvent.Set();
     }
 
-    public async Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => await CompletionsAsync(NativeMessageContent.Create(Role.User, content), tools, model, completionsUrl);
-    public async Task<ChatCompletionsResponse> CompletionsAsync(INativeMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public override Task<ChatCompletionsResponse> CompletionsAsync(string content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions") => CompletionsAsync(NativeMessageContent.Create(Role.User, content), tools, model, completionsUrl);
+    public override async Task<ChatCompletionsResponse> CompletionsAsync(INativeMessage content, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         MessageHistory.Add(content);
         return await CompletionsAsync(MessageHistory, tools, model, completionsUrl);
     }
-    public async Task<ChatCompletionsResponse> CompletionsAsync(NativeMessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
+    public override async Task<ChatCompletionsResponse> CompletionsAsync(NativeMessageCollection messageHistory, List<Tool> tools = null, string model = null, string completionsUrl = "/chat/completions")
     {
         using var _ = await BusyAsyncLock.LockAsync();
         BusyResetEvent.Reset();
@@ -264,20 +230,9 @@ public class ChatClient : INativeClient
     }
 
 
-    public void Dispose()
+    public override void Dispose()
     {
-        OnToolCallsStart = null;
-        OnToolCallInvoke = null;
-        OnToolCallsFinish = null;
-        OnToolExecuting = null;
-        OnToolExecuted = null;
-        OnStreamOutput = null;
-        OnStreamOutputCompleted = null;
-
-        Tools.Clear();
-        Tools = null;
-        MessageHistory.Clear();
-        MessageHistory = null;
+        base.Dispose();
         HttpClient.Dispose();
         BusyResetEvent.Dispose();
         BusyAsyncLock.Dispose();

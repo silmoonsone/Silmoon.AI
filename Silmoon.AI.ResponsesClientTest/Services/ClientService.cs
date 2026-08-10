@@ -1,19 +1,19 @@
 ﻿using Microsoft.Extensions.Hosting;
-using Silmoon.AI.Anthropic;
 using Silmoon.AI.Models;
-using Silmoon.AI.OpenAI.Models.Enums;
+using Silmoon.AI.OpenAI;
 using Silmoon.AI.OpenAI.Models;
+using Silmoon.AI.OpenAI.Models.Enums;
 using Silmoon.AI.Prompts;
 using Silmoon.AI.Tools;
 using Silmoon.Extensions;
 using Silmoon.Extensions.Hosting.Interfaces;
 using Silmoon.Models;
 
-namespace Silmoon.AI.AnthropicClientTest.Services;
+namespace Silmoon.AI.ResponsesClientTest.Services;
 
 public class ClientService : BackgroundService
 {
-    AnthropicClient NativeClient { get; set; }
+    ResponsesClient NativeClient { get; set; }
     IHostApplicationLifetime ApplicationLifetime { get; set; }
     bool Streaming { get; set; } = true;
 
@@ -21,7 +21,7 @@ public class ClientService : BackgroundService
     {
         ApplicationLifetime = applicationLifetime;
         var configure = (SilmoonConfigureServiceImpl)silmoonConfigureService;
-        NativeClient = new AnthropicClient(configure.Provider, configure.ModelName, $"{UtilPrompt.ContextPrompt}\r\n{configure.SystemPrompt}", disableProxy: false, httpRequestTimeoutMilliseconds: 120_000);
+        NativeClient = new ResponsesClient(configure.Provider, configure.ModelName, $"{UtilPrompt.ContextPrompt}\r\n{configure.SystemPrompt}", disableProxy: false, httpRequestTimeoutMilliseconds: 120_000);
         NativeClient.OnToolCallsStart += Client_OnToolCallsStart;
         NativeClient.OnToolExecuting += Client_OnToolExecuting;
         NativeClient.OnToolExecuted += Client_OnToolExecuted;
@@ -42,7 +42,7 @@ public class ClientService : BackgroundService
     Task<ToolCallResult> Client_OnToolCallInvoke(ToolCallParameter toolCallParameter, ToolCallResult toolCallResult)
     {
         if (toolCallParameter.FunctionName == "Test_GetSecretCode")
-            return Task.FromResult(ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>("ANTHROPIC_TOOL_OK")));
+            return Task.FromResult(ToolCallResult.Create(toolCallParameter, true.ToStateSet<object>("RESPONSES_TOOL_OK")));
         return Task.FromResult(toolCallResult);
     }
     Task Client_OnToolExecuting(string functionName, ToolCallParameter toolCallParameter)
@@ -71,7 +71,7 @@ public class ClientService : BackgroundService
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         await Task.Delay(300, stoppingToken);
-        Console.WriteLine("DeepSeek Anthropic test ready. Commands: @stream, @nostream, @clear, @exit");
+        Console.WriteLine("Responses test ready. Commands: @stream, @nostream, @clear, @exit");
         while (!stoppingToken.IsCancellationRequested)
         {
             Console.Write(Role.User + ": ");
@@ -152,4 +152,3 @@ public class ClientService : BackgroundService
         }
     }
 }
-
